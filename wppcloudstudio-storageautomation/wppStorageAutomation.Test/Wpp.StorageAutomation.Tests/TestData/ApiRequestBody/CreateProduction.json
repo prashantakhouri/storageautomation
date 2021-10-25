@@ -1,0 +1,37 @@
+﻿{
+  "productionStoreUri": "//productionStore/",
+  "productionName": "MicrosoftAdCampaign",
+  "directoryTree": [
+    {
+      "type": "folder",
+      "name": "production",
+      "path": "/{productionToken}",
+      "subitems": [
+        {
+          "type": "folder",
+          "name": "rawAssets",
+          "path": "raw assets",
+          "subitems": [
+            {
+              "type": "folder",
+              "name": "images",
+              "path": "Image",
+              "subitems": []
+            },
+            {
+              "type": "folder",
+              "name": "video",
+              "path": "Video",
+              "subitems": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "tokens": [
+    {
+      "productionToken": "MicrosoftAdCampaign"
+    }
+  ]
+}

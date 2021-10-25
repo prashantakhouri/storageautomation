@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--https://docs.microsoft.com/en-us/visualstudio/test/configure-unit-tests-by-using-a-dot-runsettings-file-->
+<RunSettings>
+  <!-- Configurations that affect the Test Framework -->
+  <RunConfiguration>
+
+    <!-- 0 = Use all Cores -->
+    <MaxCpuCount>0</MaxCpuCount>
+
+    <!-- Path relative to solution directory -->
+    <ResultsDirectory>.\TestResults</ResultsDirectory>
+    <TestSessionTimeout>30000000</TestSessionTimeout>
+  </RunConfiguration>
+
+  <!-- Parameters used by tests at runtime -->
+  <TestRunParameters>
+
+    <!-- Common -->
+
+    <!-- Dev -->
+    <Parameter name="appSettings:Env" value="dev" />
+    
+    <Parameter name="appSettings:WebAppUrl" value="https://wppcs-cloudstudioportal-dev-01.azurewebsites.net/get-production" />   
+    <Parameter name="appSettings:apiBaseUrl" value="https://apim-wppcs-weu-dev-apigateway-01.azure-api.net" />
+    <Parameter name="appSettings:Token" value="" />
+    <Parameter name="appSettings:browser" value="Chrome" />
+
+
+    <!-- DB Details -->
+    <Parameter name="database:DbServer" value="tcp:sql-wppcs-weu-dev-01.database.windows.net,1433" />
+    <Parameter name="database:DbKey" value="wppsqldb" />
+    <Parameter name="database:DbUser" value="" />
+    <Parameter name="database:DbPwd" value="" />
+    <Parameter name="chaosMonkey:Enabled" value="false" />
+
+    <!-- WIP Storage -->
+    <Parameter name="wipStorage:ConnectionStringKey" value="" />
+    
+    <Parameter name="wipStorage:ProductionStore1" value="productionstorea" />
+    <Parameter name="wipStorage:ProductionStore1_Production1" value="Test-Production" />
+    <Parameter name="wipStorage:ProductionStore1_Production1_SubDir1" value="Test-Production/Test-Subfolder-L1" />
+
+    <Parameter name="wipStorage:ProductionStore2" value="archive-ps2" />
+    <Parameter name="wipStorage:ProductionStore2_Production1" value="" />
+    <Parameter name="wipStorage:ProductionStore2_EmptyProduction" value="archive-ps2-Empty" />
+    
+    <Parameter name="wipStorage:ProductionStore3" value="restore-ps" />
+    <Parameter name="wipStorage:ProductionStore3_Production1" value="TestProduction-restore-ps" />
+    <Parameter name="wipStorage:Region1" value="North Europe" />
+
+
+    <!-- Archive Storage -->
+    <Parameter name="archiveStorage:ConnectionStringKey" value="" />
+
+    <Parameter name="archiveStorage:ProductionStore1" value="productionstorea" />
+    <Parameter name="archiveStorage:ProductionStore1_Production1" value="Test-Production" />
+    <Parameter name="archiveStorage:ProductionStore1_Production1_SubDir1" value="Test-Production/Test-Subfolder-L1" />
+
+    <Parameter name="archiveStorage:ProductionStore2" value="archive-ps2" />
+    <Parameter name="archiveStorage:ProductionStore2_Production1" value="" />
+    <Parameter name="archiveStorage:ProductionStore2_EmptyProduction" value="archive-ps2-Empty" />
+
+    <Parameter name="archiveStorage:ProductionStore3" value="restore-ps" />
+    <Parameter name="archiveStorage:ProductionStore3_Production1" value="TestProduction-restore-ps" />
+    
+    <!-- TestData Storage -->
+    <Parameter name="testDataStorage:ConnectionStringKey" value="" />
+    <Parameter name="testDataStorage:UseLargeSizeProductionsForTesting" value="" />
+
+
+  </TestRunParameters>
+</RunSettings>

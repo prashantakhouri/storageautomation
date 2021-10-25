@@ -1,0 +1,25 @@
+#https://apim-wppcs-neu-perf-apigateway-01.azure-api.net
+#sawppcsneupfp1; sawppcsneupfb1; sql-wppcs-neu-perf-sql-01; rg-wppcs-neu-perf-data-01
+variables:
+- name: env
+  value: 'perf'
+- name: commonTestEnv
+  value: 't'
+- name: hostnameWPPSA 
+  value: '$(hostnameStaticPrefix)-$(project)-$(regionShortNameNEU)-$(env)-$(hostnameStaticSuffix)'
+- name: storageAccountWIP
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(storageAccountNamePerf)$(storageAccountTypeFSPremium)$(sequenceSA)'
+- name: storageAccountARC
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(storageAccountNamePerf)$(storageAccountTypeBlob)$(sequenceSA)'
+- name: sqlServerName
+  value: '$(resourceTypeSQL)-$(project)-$(regionShortNameNEU)-$(env)-$(resourceTypeSQL)-$(sequence)'
+- name: resourceGroupName
+  value: '$(resourceGroupPrefix)-$(project)-$(regionShortNameNEU)-$(env)-$(resourceGroupStaticName)-$(sequence)'
+- name: sampleDataSourceStorageAccountName
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(commonTestEnv)datastore'
+- name: sampleDataSourceResourceGroupName
+  value: '$(resourceGroupPrefix)-$(project)-$(regionShortNameNEU)-$(commonTestEnv)-datamanagement'
+- name: clientId
+  value: $(wpp-it-cloudstudio-app-t-001-id)
+- name: clientSecret
+  value: $(wpp-it-cloudstudio-app-t-001-sec)

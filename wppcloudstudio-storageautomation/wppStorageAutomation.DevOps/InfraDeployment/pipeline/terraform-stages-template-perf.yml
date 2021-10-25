@@ -1,0 +1,272 @@
+#-- This template will build the terraform code by stages
+#-- By using this template we can resue the code to build multiple enviroemnets
+
+#Parameters
+parameters:
+  - name: Environment
+    type: string
+  - name: TerraformDirectory
+    type: string
+  - name: TerraformVersion
+    type: string
+  - name: location
+    type: string
+  - name: locationshortprefix
+    type: string
+  - name: provisionStorage
+    type: string
+#-- these parameters values are static for terrafrom backend config --#
+  - name: prefix
+    type: string
+    default: wppcs
+  - name: component
+    type: string
+    default: terraform
+# -- resource shortprefix these should not change for terraform config #
+  - name: resourcegroupshortprefix
+    type: string
+    default: 'rg'
+  - name: storagaccounshortprefix
+    type: string
+    default: 'sa'
+  - name: TERRAFORM_BREAK_LEASE
+    type: string
+    default: ""
+
+# # Image to use for the pipeline stages and jobs
+# pool:
+#   vmImage: ubuntu-latest
+
+stages:
+- stage: Terraform_Plan_${{ parameters.Environment }}
+  displayName: Plan ${{ parameters.Environment }}
+  jobs:
+  - job: Terraform_Plan
+    displayName: Plan Terraform
+
+    # Avoid concurrent Terraform runs on PRs, which would result in failures due to exclusive lock on remote state file.
+    # condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), variables['RUN_FLAG_TERRAFORM']))
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    # Verify that the Environment parameter has been supplied to pipeline
+
+    - script: |
+        set +e
+        if [ -z ${{ parameters.Environment }} ]; then
+        echo "target Environment not specified";
+        exit 1;
+        fi
+        echo "Environment is:" ${{ parameters.Environment }}
+      displayName: 'Verify that the Environment parameter has been supplied to pipeline'
+
+    # - template: ./terraform-init-template-perf.yml
+    #   parameters:
+    #     Environment: ${{ parameters.Environment }}
+    #     TerraformDirectory: ${{ parameters.TerraformDirectory }}
+    #     provisionStorage: ${{ parameters.provisionStorage }}
+    #     location: ${{ parameters.location }}
+    #     locationshortprefix: ${{ parameters.locationshortprefix }}
+    #     TerraformVersion: ${{ parameters.TerraformVersion }}
+    #     sequence: ${{ parameters.sequence }}
+
+    # # Downloading secure file 
+
+    # - task: DownloadSecureFile@1
+    #   name: securefile
+    #   displayName: 'Download secure file'
+    #   inputs:
+    #     secureFile: '.terraformrc-cs'
+
+    # Installing terraform
+    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+      displayName: "Terraform Install"
+      inputs:
+        terraformVersion: ${{ parameters.TerraformVersion }}
+
+    # Validate the terraform version
+    - script: |
+          terraform version
+      displayName: "Terraform Version"
+
+    # Terraform init
+
+    # Set Terraform backend if provisionStorage is set to true
+    - script: |
+        set -eu  # fail on error
+        az login --service-principal -u  $(wpp-app-subscription-clientid) -p $(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+        az account set --subscription $(wpp-app-subscription-id)
+        RG='${{parameters.resourcegroupshortprefix }}-${{parameters.prefix }}-${{parameters.locationshortprefix }}-${{parameters.Environment }}-${{parameters.component }}-$(sequence)'
+        export AZURE_STORAGE_ACCOUNT='${{parameters.storagaccounshortprefix }}${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}'
+        export AZURE_STORAGE_KEY="$(az storage account keys list -g $RG -n $AZURE_STORAGE_ACCOUNT --query '[0].value' -o tsv)"
+        if test -z "$AZURE_STORAGE_KEY"; then
+          az configure --defaults group=$RG location='${{ parameters.location }}'
+          az group create -n "$RG" -o none
+          az storage account create -n "$AZURE_STORAGE_ACCOUNT" -o none
+          export AZURE_STORAGE_KEY="$(az storage account keys list -g $RG -n $AZURE_STORAGE_ACCOUNT --query '[0].value' -o tsv)"
+        fi
+        container='${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}container'
+        if ! az storage container show -n "$container" -o none 2>/dev/null; then
+          az storage container create -n "$container" -o none
+        fi
+        blob='${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}.tfstate'
+        if [[ $(az storage blob exists -c "$container" -n "$blob" --query exists) = "true" ]]; then
+          if [[ $(az storage blob show -c "$container" -n "$blob" --query "properties.lease.status=='locked'") = "true" ]]; then
+            echo "State is leased"
+            lock_jwt=$(az storage blob show -c "$container" -n "$blob" --query metadata.terraformlockid -o tsv)
+            if [ "$lock_jwt" != "" ]; then
+              lock_json=$(base64 -d <<< "$lock_jwt")
+              echo "State is locked"
+              jq . <<< "$lock_json"
+            fi
+            if [ "${TERRAFORM_BREAK_LEASE:-}" != "" ]; then
+              az storage blob lease break -c "$container" -b "$blob"
+            else
+              echo "If you're really sure you want to break the lease, rerun the pipeline with variable TERRAFORM_BREAK_LEASE set to 1."
+              exit 1
+            fi
+          fi
+        fi
+
+      workingDirectory: $(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment/${{ parameters.TerraformDirectory }}
+      displayName: 'Set Terraform Backend'
+      env:
+        ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+        ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+        ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+        ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+    - script: |
+          # export TF_CLI_CONFIG_FILE='$(securefile.secureFilePath)'
+          terraform init -input=false \
+          -backend-config="resource_group_name=${{parameters.resourcegroupshortprefix }}-${{parameters.prefix }}-${{parameters.locationshortprefix }}-${{parameters.Environment }}-${{parameters.component }}-$(sequence)" \
+          -backend-config="storage_account_name=${{parameters.storagaccounshortprefix }}${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}" \
+          -backend-config="container_name=${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}container" \
+          -backend-config="key=${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}.tfstate" \
+          -backend-config="subscription_id=$(wpp-app-subscription-id)" \
+          -backend-config="tenant_id=$(wpp-app-subscription-tenant-id)" \
+          -backend-config="client_id=$(wpp-app-subscription-clientid)" \
+          -backend-config="client_secret=$(wpp-app-subscription-clientsecret)"
+          terraform validate
+      workingDirectory: '$(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment/${{ parameters.TerraformDirectory }}'
+      displayName: 'Terraform Init'
+      env:
+        TF_CLI_CONFIG_FILE: '$(securefile.secureFilePath)'
+        ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+        ARM_CLIENT_ID:       $(wpp-app-subscription-clientid)
+        ARM_CLIENT_SECRET:   $(wpp-app-subscription-clientsecret)
+        ARM_TENANT_ID:       $(wpp-app-subscription-tenant-id)
+
+    # Terraform Plan
+
+    - script: |
+        # export TF_CLI_CONFIG_FILE='$(securefile.secureFilePath)'
+        terraform plan -input=false -out=tfplan -var-file=${{ parameters.Environment }}_var.tfvars -var 'Environment=${{ parameters.Environment }}' -var 'locationshortprefix=${{ parameters.locationshortprefix  }}' -var 'rg_location=${{ parameters.location }}' -var 'administrator_login=$(sqlAdminLoginId)' -var 'administrator_login_password=$(sqlAdminLoginPassword)' -var 'order=$(sequence)' -var 'value1=$(authserver-app-clientid)' -var 'value2=$(authserver-app-url)' -var 'value3=$(func-wppcs-datamovement-appreg-id)' -var 'value4=$(sddl-create-production)' -var 'value5=$(sddl-readonly-makeoffline)' -var 'value6=$(graphapi-wppcs-adgroup-appreg-id)' -var 'value7=$(graphapi-wppcs-adgroup-appreg-sec)' -var 'value8=$(wpp-it-cloudstudio-tenant)' -var 'value9=$(authserver-app-url)/oauth2/v1' -var 'value10=$(sddl-fullcontrol-config)' -var 'hub_sub=$(tf-subscription-hub-id)' -var 'main_sub=$(tf-subscription-id)'
+        terraform show -no-color tfplan > plan.txt
+        # Resource providers can be > 100MB large, we don't want them in the published artifacts.
+        rm -r .terraform
+      workingDirectory: '$(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment/${{ parameters.TerraformDirectory }}'
+      displayName: 'Terraform Plan'
+      env:
+        ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+        ARM_CLIENT_ID:       $(wpp-app-subscription-clientid)
+        ARM_CLIENT_SECRET:   $(wpp-app-subscription-clientsecret)
+        ARM_TENANT_ID:       $(wpp-app-subscription-tenant-id)
+
+    - bash: |
+        echo "set current working directory"
+        # Set the current directory to InfraDeployment
+        cd $(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment  
+        echo "current working directory"
+        pwd
+      displayName: Setting artifacts path to root
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish plan artifact
+      inputs:
+        targetPath: $(System.DefaultWorkingDirectory)
+        artifact: terraform_resources_${{ parameters.Environment }}
+
+#-- terafrom validate and apply stage
+
+- stage: Terraform_Apply_${{ parameters.Environment }}
+  displayName: Apply ${{ parameters.Environment }}
+  jobs:
+  - deployment: Apply
+    environment: ${{ parameters.Environment }}
+    displayName: Apply Terraform
+    #condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), variables['RUN_FLAG_TERRAFORM']))
+    timeoutInMinutes: 120
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download plan
+            inputs:
+              artifactName: terraform_resources_${{ parameters.Environment }}
+              targetPath: $(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment/terraform_resources
+
+          # - template: ./terraform-init-template-perf.yml
+          #   parameters:
+          #     TerraformDirectory: terraform_resources/wppStorageAutomation.DevOps/InfraDeployment/${{ parameters.TerraformDirectory }}
+          #     Environment: ${{ parameters.Environment }}
+          #     provisionStorage: ${{ parameters.provisionStorage }}
+          #     location: ${{ parameters.location }}
+          #     locationshortprefix: ${{ parameters.locationshortprefix }}
+          #     TerraformVersion: ${{ parameters.TerraformVersion }}
+
+              # Downloading secure file 
+
+          # - task: DownloadSecureFile@1
+          #   name: securefile
+          #   displayName: 'Download secure file'
+          #   inputs:
+          #     secureFile: '.terraformrc-cs'
+
+          # Installing terraform
+          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+            displayName: "Terraform Install"
+            inputs:
+              terraformVersion: ${{ parameters.TerraformVersion }}
+
+          # Validate the terraform version
+          - script: |
+                terraform version
+            displayName: "Terraform Version"
+
+          # Terraform init
+
+          - script: |
+                # export TF_CLI_CONFIG_FILE='$(securefile.secureFilePath)'
+                terraform init -reconfigure -force-copy -upgrade -input=false \
+                -backend-config="resource_group_name=${{parameters.resourcegroupshortprefix }}-${{parameters.prefix }}-${{parameters.locationshortprefix }}-${{parameters.Environment }}-${{parameters.component }}-$(sequence)" \
+                -backend-config="storage_account_name=${{parameters.storagaccounshortprefix }}${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}" \
+                -backend-config="container_name=${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}container" \
+                -backend-config="key=${{parameters.prefix }}${{parameters.locationshortprefix }}${{parameters.Environment }}${{parameters.component }}.tfstate" \
+                -backend-config="subscription_id=$(wpp-app-subscription-id)" \
+                -backend-config="tenant_id=$(wpp-app-subscription-tenant-id)" \
+                -backend-config="client_id=$(wpp-app-subscription-clientid)" \
+                -backend-config="client_secret=$(wpp-app-subscription-clientsecret)"
+            workingDirectory: '$(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment/terraform_resources/wppStorageAutomation.DevOps/InfraDeployment/${{ parameters.TerraformDirectory }}'
+            displayName: 'Terraform Init'
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID:       $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET:   $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID:       $(wpp-app-subscription-tenant-id)
+
+          - script: |
+              # export TF_CLI_CONFIG_FILE='$(securefile.secureFilePath)'
+              terraform apply -no-color -input=false -auto-approve tfplan
+            displayName: Terraform apply
+            workingDirectory: $(System.DefaultWorkingDirectory)/wppStorageAutomation.DevOps/InfraDeployment/terraform_resources/wppStorageAutomation.DevOps/InfraDeployment/${{ parameters.TerraformDirectory }}
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID:       $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET:   $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID:       $(wpp-app-subscription-tenant-id)

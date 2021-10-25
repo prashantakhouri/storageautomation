@@ -1,0 +1,14 @@
+﻿# Inheritance: https://learnxinyminutes.com/docs/yaml/
+-
+    Element: &FontFamily
+        Name: FontFamily
+        FontFamily: 'arial, sans-serif'
+-
+    Element:
+        << : *FontFamily
+        Name: Anchor
+        Locator: //a
+        FontSize: 13px
+        FontWeight: '400'
+        Color: 'rgb(95, 99, 104, 1)'
+        BackgroundColor: 'rgba(0, 0, 0, 0)'

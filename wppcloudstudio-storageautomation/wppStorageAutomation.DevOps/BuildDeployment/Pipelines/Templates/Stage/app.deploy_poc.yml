@@ -1,0 +1,4 @@
+jobs:
+ - template: ../Deploy/app.deploy_poc.yml
+   parameters:
+     env: ${{parameters.env}}

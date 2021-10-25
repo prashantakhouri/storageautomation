@@ -1,0 +1,23 @@
+#sawppcsneuds1; sawppcsneudb1; sql-wppcs-neu-d-sql-01; rg-wppcs-neu-d-data-01
+#rg-wppcs-neu-d-datamanagement; sawppcsneuddatastore
+variables:
+- name: env
+  value: 'd'
+- name: hostnameWPPSA 
+  value: '$(hostnameStaticPrefix)-$(project)-$(regionShortNameNEU)-$(env)-$(hostnameStaticSuffix)'
+- name: storageAccountWIP
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(env)$(storageAccountTypeFSPremium)$(sequenceSA)'
+- name: storageAccountARC
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(env)$(storageAccountTypeBlob)$(sequenceSA)'
+- name: sqlServerName
+  value: '$(resourceTypeSQL)-$(project)-$(regionShortNameNEU)-$(env)-$(resourceTypeSQL)-$(sequence)'
+- name: resourceGroupName
+  value: '$(resourceGroupPrefix)-$(project)-$(regionShortNameNEU)-$(env)-$(resourceGroupStaticName)-$(sequence)'
+- name: sampleDataSourceStorageAccountName
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(env)datastore'
+- name: sampleDataSourceResourceGroupName
+  value: '$(resourceGroupPrefix)-$(project)-$(regionShortNameNEU)-$(env)-datamanagement'
+- name: clientId
+  value: $(wpp-it-cloudstudio-app-d-001-id)
+- name: clientSecret
+  value: $(wpp-it-cloudstudio-app-d-001-sec)

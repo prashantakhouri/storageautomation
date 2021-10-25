@@ -1,0 +1,44 @@
+name: WPP Cloud Studio Build Deployment
+
+variables:
+  - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/environment.yml
+  - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/package.yml
+  - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/infra.yml
+
+    # NOTE POC is for experimental changes only
+
+trigger: none
+pr: none
+
+stages:
+    - stage: Startup
+      jobs:
+      - job: Initialize
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+        - script: echo 'Initialisation completed'
+
+    - stage: Build_App_Artifacts
+      jobs:
+        - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Stage/app.build_poc.yml
+      dependsOn:
+      - Startup
+      condition: succeeded('Startup')
+
+    - stage: POC_App_Deployment
+      variables:
+        - group: wppstorageautomationGroup-poc
+        - group: "Cloud Studio Keyvault - poc"
+        - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/Values_poc.yml
+      jobs:
+        - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Stage/app.deploy_poc.yml
+          parameters:
+            env: ${{ variables.env }}
+      dependsOn:
+      - Build_App_Artifacts
+      condition: succeeded('Build_App_Artifacts')
+
+
+     
+  

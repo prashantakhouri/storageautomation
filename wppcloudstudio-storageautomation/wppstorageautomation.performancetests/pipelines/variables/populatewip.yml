@@ -1,0 +1,219 @@
+jobs:
+
+  - job: job_get_production_store_wip
+    displayName: 'Get SQL Data for Hybrid Production Store'
+    condition: always()
+    pool:
+      vmImage: 'windows-latest'    
+    steps:
+          - powershell: |
+              #Global Variables
+              $productionStoreHybridName=""
+              $productionStoreHybridGUID=""
+              $boolPSExceedLimit="false"
+              $boolTableEmpty="true"
+              $varproductionStoreHybridName=""
+              $varproductionStoreHybridGUID=""
+              $varboolPSExceedLimit=""
+              $varboolTableEmpty=""
+              #Log-In to Azure using SPN and set required AzureSubscription
+              az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+              az account set --subscription $(tf-subscription-sa-id)
+              #Get HybridProductionStore GUID along with Large,Medium and Small Production GUIDs
+              echo ""
+              echo "$(queryHybridProductionStoreCount)"
+              $dataTableCount=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryHybridProductionStoreCount)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables                 
+              $count=$dataTableCount[0].Rows | %{ echo $_.Count }
+              if($count -eq 1)
+              {
+                echo "$(queryHybridProductionStore)"                
+                $dataTable=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryHybridProductionStore)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                if (-not [string]::IsNullOrEmpty($dataTable))
+                {
+                  $productionStoreHybridGUID=$dataTable[0].Rows | %{ echo $_.Id }
+                  $productionStoreHybridName=$dataTable[0].Rows | %{ echo $_.Name }
+                  echo "Existing Production Store Name: $productionStoreHybridName & GUID: $productionStoreHybridGUID"
+                }
+              }
+              elseif($count -gt 1)
+              {
+                echo "Found multiple 'Production Stores' containing name 'hybrid-31gb'. Will start purging all such records so that there's always 1 PS for incremental data push"                
+                echo "$(queryHybridDeleteProductionStore)"
+                Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryHybridDeleteProductionStore)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                echo "Completed purging all such SQL records from Tables 'ProductionStore' & 'Production' in $(sqlDBName)"
+                echo "Next step involves creation of 'Production Store' & 'Production' and post that data will be copied"                
+                $boolTableEmpty="false"
+                $boolPSExceedLimit="true"
+              }
+              else
+              {
+                echo "No matching records found in SQL, hence 'Production Store' & 'Production' needs to be created and post that data will be copied"
+                $boolTableEmpty="false"
+              }
+              echo "Records available in SQL: $boolTableEmpty"
+              echo "##vso[task.setvariable variable=varboolTableEmpty;isOutput=true;]$boolTableEmpty"              
+              echo "##vso[task.setvariable variable=varproductionStoreHybridGUID;isOutput=true;]$productionStoreHybridGUID"              
+              echo "##vso[task.setvariable variable=varproductionStoreHybridName;isOutput=true;]$productionStoreHybridName"
+              echo "##vso[task.setvariable variable=varboolPSExceedLimit;isOutput=true;]$boolPSExceedLimit"
+            name: getproductionstorestepWIP    
+            displayName: 'Get SQL Data for Hybrid Production Store'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)              
+
+  - job: job_populate_data_storageaccount_wip
+    displayName: 'Populate Incremental Data to WIP Storage Account'
+    condition:  eq('${{ parameters.populateDataWIP }}', 'true')
+    dependsOn: ['job_get_production_store_wip']    
+    pool:
+      vmImage: 'ubuntu-latest'
+    variables:
+      variableboolTableEmpty:  $[ dependencies.job_get_production_store_wip.outputs['getproductionstorestepWIP.varboolTableEmpty'] ]    
+      variableproductionStoreHybridGUID:  $[ dependencies.job_get_production_store_wip.outputs['getproductionstorestepWIP.varproductionStoreHybridGUID'] ]    
+      variableproductionStoreHybridName:  $[ dependencies.job_get_production_store_wip.outputs['getproductionstorestepWIP.varproductionStoreHybridName'] ]
+      variableboolPSExceedLimit:  $[ dependencies.job_get_production_store_wip.outputs['getproductionstorestepWIP.varboolPSExceedLimit'] ]              
+    steps:
+          - bash: |
+                set -eu #Error Resilience
+                #Global Variables
+                productionStoreHybridName=""
+                productionStoreHybridGUID=""                
+                productionSmallHybridName=""
+                productionMediumHybridName=""
+                productionLargeHybridName=""
+                varProductionStores=""
+                varProductions=""
+                queryProductionStores=""
+                queryProductions=""
+                boolCreateProductionStore="$(variableboolTableEmpty)"
+                boolRemoveExistingProductionStores=$(variableboolPSExceedLimit)
+                #Dynamic Global Variable
+                guid=$(uuidgen)
+                #Function to Log-In to Azure using SPN and fetch storageAccountKeyWIP
+                function LoginAndFetchAccountKey(){
+                az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+                az account set --subscription $(tf-subscription-sa-id)
+                #Fetch storageAccountKeyWIP
+                export sampleDataSourceStorageAccountKey="$(az storage account keys list -g $(sampleDataSourceResourceGroupName) -n $(sampleDataSourceStorageAccountName) --query '[0].value' -o tsv)"
+                export storageAccountKeyWIP="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountWIP) --query '[0].value' -o tsv)"
+                }
+                #Function to Create Production(s) within a 'Production Store' 
+                function CreateProductionSML(){
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreHybridName" --name "$productionSmallHybridName" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreHybridName" --name "$productionSmallHybridName/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreHybridName" --name "$productionMediumHybridName" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreHybridName" --name "$productionMediumHybridName/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreHybridName" --name "$productionLargeHybridName" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreHybridName" --name "$productionLargeHybridName/$(subproductionVideo)" --output none
+                  echo "S/M/L Production(s) created successfully"
+                }
+                #Check for redundant Production Stores containing name 'hybrid-31gb'
+                #LoginAndFetchAccountKey() Function Invoke
+                LoginAndFetchAccountKey                
+                if [[ $boolRemoveExistingProductionStores == "true" ]]; then
+                  if [[ $(az storage share list --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --query "[].name") != "[]" ]]; then
+                    echo "Starting with 'Purge' of Production Stores(containing name: hybrid-31gb) under SA: $(storageAccountWIP)"
+                    az storage share list --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --query "[?contains(name,'$(productionStoreHybrid)')].name" --output tsv | xargs -L1 bash -ec 'az storage share delete --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --name $0 --delete-snapshots include --output none'
+                    echo "Completed purging Production Stores(containing name: hybrid-31gb) under SA: $(storageAccountWIP)"
+                  else
+                    echo 'No file shares(containing name: hybrid-31gb) found for purging' 
+                  fi
+                fi                
+                #No Existing Production Store and/or Productions
+                if [[ $boolCreateProductionStore == "false" ]]; then
+                  #LoginAndFetchAccountKey() Function Invoke
+                  LoginAndFetchAccountKey
+                  #Dynamic Variables
+                  ticks=$(date +%s%3N)
+                  productionStoreHybridName=$(productionStoreStaticWIP)-$(productionStoreHybrid)-$(date +%F)-$ticks
+                  productionStoreHybridGUID=$(uuidgen)
+                  productionSmallHybridName=$(productionSmallHybridWIP)_$guid
+                  productionMediumHybridName=$(productionMediumHybridWIP)_$guid
+                  productionLargeHybridName=$(productionLargeHybridWIP)_$guid
+                  #SQL DML Statements
+                  varProductionStores+="INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreHybridGUID', '$productionStoreHybridName','North Europe','\\$productionStoreHybridName',$(sqlAllocatedSize),'\\$productionStoreHybridName',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');"
+                  varProductions+="INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionSmallHybridName', '$productionStoreHybridGUID','/$productionStoreHybridName/$productionSmallHybridName', NULL, '/$productionStoreHybridName/$productionSmallHybridName', 'Online', GETUTCDATE(), NULL, NULL, 0, NULL, GETUTCDATE(), NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionMediumHybridName', '$productionStoreHybridGUID','/$productionStoreHybridName/$productionMediumHybridName', NULL, '/$productionStoreHybridName/$productionMediumHybridName', 'Online', GETUTCDATE(), NULL, NULL, 0, NULL, GETUTCDATE(), NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionLargeHybridName', '$productionStoreHybridGUID','/$productionStoreHybridName/$productionLargeHybridName', NULL, '/$productionStoreHybridName/$productionLargeHybridName', 'Online', GETUTCDATE(),  NULL, NULL, 0, NULL, GETUTCDATE(), NULL, NULL);"                    
+                  echo "############################################# STARTS Here #############################################"                    
+                  echo $varProductionStores
+                  echo $varProductions
+                  echo ""               
+                  echo "Going ahead with creation of 'Single Hybrid Production Store(file share)', 'S/M/L Productions' and copying of pre-requisite data"
+                  #Creation of 'Production Store'          
+                  az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreHybridName" --quota $(fileShareQuotaHybrid) --enabled-protocols SMB --output none
+                  echo "Hybrid Production Store(file share) created successfully"
+                  CreateProductionSML #CreateProductionSML() Function Invoke
+                  #Copy Sample Data to Production
+                  echo "Now starting with copy of data to $productionStoreHybridName"
+                  az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceSmall) --destination-path "$productionSmallHybridName/$(subproductionVideo)" --destination-share "$productionStoreHybridName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                  az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceMedium) --destination-path "$productionMediumHybridName/$(subproductionVideo)" --destination-share "$productionStoreHybridName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                  az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceLarge) --destination-path "$productionLargeHybridName/$(subproductionVideo)" --destination-share "$productionStoreHybridName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                  echo "Completed copying data to S/M/L Productions within Production Store(file share): $productionStoreHybridName under SA: $(storageAccountWIP)"
+                  echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ ENDS here @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                  echo ""
+                else    #Existing Production Store
+                  #LoginAndFetchAccountKey() Function Invoke
+                  LoginAndFetchAccountKey                
+                  productionStoreHybridName=$(variableproductionStoreHybridName)
+                  productionStoreHybridGUID=$(variableproductionStoreHybridGUID)                  
+                  productionSmallHybridName=$(productionSmallHybridWIP)_$guid
+                  productionMediumHybridName=$(productionMediumHybridWIP)_$guid
+                  productionLargeHybridName=$(productionLargeHybridWIP)_$guid
+                  #SQL DML Statements
+                  varProductions+="INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionSmallHybridName', '$productionStoreHybridGUID','/$productionStoreHybridName/$productionSmallHybridName', NULL, '/$productionStoreHybridName/$productionSmallHybridName', 'Online', GETUTCDATE(), NULL, NULL, 0, NULL, GETUTCDATE(), NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionMediumHybridName', '$productionStoreHybridGUID','/$productionStoreHybridName/$productionMediumHybridName', NULL, '/$productionStoreHybridName/$productionMediumHybridName', 'Online', GETUTCDATE(), NULL, NULL, 0, NULL, GETUTCDATE(), NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionLargeHybridName', '$productionStoreHybridGUID','/$productionStoreHybridName/$productionLargeHybridName', NULL, '/$productionStoreHybridName/$productionLargeHybridName', 'Online', GETUTCDATE(),  NULL, NULL, 0, NULL, GETUTCDATE(), NULL, NULL);"
+                  echo "############################################# STARTS Here #############################################"
+                  echo $varProductions
+                  echo ""
+                  CreateProductionSML #CreateProductionSML() Function Invoke
+                  #Copy Sample Data to Production
+                  echo "Now starting with incremental data population to $productionStoreHybridName"
+                  az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceSmall) --destination-path "$productionSmallHybridName/$(subproductionVideo)" --destination-share "$productionStoreHybridName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                  az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceMedium) --destination-path "$productionMediumHybridName/$(subproductionVideo)" --destination-share "$productionStoreHybridName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                  az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceLarge) --destination-path "$productionLargeHybridName/$(subproductionVideo)" --destination-share "$productionStoreHybridName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                  echo "Completed copying data to S/M/L Productions within Production Store(file share): $productionStoreHybridName under SA: $(storageAccountWIP)"
+                  echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ ENDS here @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                  echo ""
+                fi
+                echo "##vso[task.setvariable variable=queryProductionStores;isOutput=true;]$varProductionStores"
+                echo "##vso[task.setvariable variable=queryProductions;isOutput=true;]$varProductions"
+            name: dynamicdatagenerationstepWIP    
+            displayName: 'Populate Incremental Data to WIP Storage Account'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+
+  - job: job_populate_data_sqldatabase_wip
+    displayName: 'Populate WIP Data in SQL Tables'
+    dependsOn: ['job_populate_data_storageaccount_wip']
+    condition:  succeeded('job_populate_data_storageaccount_wip')
+    pool:
+      vmImage: 'windows-latest'
+    variables:
+      queryInsertProductionStores:  $[ dependencies.job_populate_data_storageaccount_wip.outputs['dynamicdatagenerationstepWIP.queryProductionStores'] ]
+      queryInsertProductions:  $[ dependencies.job_populate_data_storageaccount_wip.outputs['dynamicdatagenerationstepWIP.queryProductions'] ]
+    steps:   
+    - powershell: |
+        #Log-In to Azure using SPN and set required AzureSubscription
+        az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+        az account set --subscription $(tf-subscription-sa-id)
+        if("$(queryInsertProductionStores)" -eq "")
+        {
+          echo "$(queryInsertProductions)"
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertProductions)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+        }
+        else
+        {
+          echo "$(queryInsertProductionStores)"
+          echo "$(queryInsertProductions)"
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertProductionStores)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertProductions)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+        }        
+      displayName: 'Populate WIP Data - ProductionStore & Production Tables'
+      env:
+        ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+        ARM_CLIENT_ID: $(clientId)
+        ARM_CLIENT_SECRET: $(clientSecret)
+        ARM_TENANT_ID: $(wpp-it-cloudstudio-tenant)

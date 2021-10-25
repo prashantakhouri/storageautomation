@@ -1,0 +1,260 @@
+﻿jobs:
+   
+  - job: BuildAppArtifacts
+    pool:
+     vmImage: 'windows-latest'
+
+    steps:
+    # POC is for experimental changes (may not be owrking)
+    # Downloads a GitHub Release from a repository
+    # - task: DownloadGitHubRelease@0
+    #   inputs:
+    #     connection: $(githubConnection)
+    #     userRepository: $(userRepository)
+    #     #defaultVersionType: 'latest' # Options: latest, specificVersion, specificTag
+    #     #version: # Required when defaultVersionType != Latest
+    #     #itemPattern: '**' # Optional
+    #     downloadPath: '$(Build.SourcesDirectory)' 
+   
+   # For Debug (copy solution) - later comment this copy task 
+    # - task: CopyFiles@2
+    #   displayName: 'Retrieve Project Solution'
+    #   inputs:
+    #       CleanTargetFolder: false
+    #       SourceFolder: '$(Build.SourcesDirectory)/wppStorageAutomation/src/'
+    #       Contents: '**'
+    #       TargetFolder: '$(Build.SourceDirectory)/Solution'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+#     # Build Function Apps 
+
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'Build ProductionStore'
+    #   inputs:
+    #     projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.ProductionStore/Wpp.StorageAutomation.ProductionStore.csproj'
+    #     arguments: '--output publish_output_ps --configuration Release'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive ProductionStore'
+    #   inputs:
+    #     rootFolderOrFile: 'publish_output_ps/'
+    #     includeRootFolder: false
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/ProductionStore.zip'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'Build Production'
+    #   inputs:
+    #     projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.Production/Wpp.StorageAutomation.Production.csproj'
+    #     arguments: '--output publish_output_pc --configuration Release'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive Production'
+    #   inputs:
+    #     rootFolderOrFile: 'publish_output_pc/'
+    #     includeRootFolder: false
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/Production.zip'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'Build DataMovement'
+    #   inputs:
+    #     projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.DataMovement/Wpp.StorageAutomation.DataMovement.csproj'
+    #     arguments: '--output publish_output_dm --configuration Release'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive DataMovement'
+    #   inputs:
+    #     rootFolderOrFile: 'publish_output_dm/'
+    #     includeRootFolder: false
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/DataMovement.zip'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'Build ArchiveScheduler'
+    #   inputs:
+    #     projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.ArchiveScheduler/Wpp.StorageAutomation.ArchiveScheduler.csproj'
+    #     arguments: '--output publish_output_arcsch --configuration Release'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive ArchiveScheduler'
+    #   inputs:
+    #     rootFolderOrFile: 'publish_output_arcsch/'
+    #     includeRootFolder: false
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/ArchiveScheduler.zip'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+# # # Build Database
+
+    # - task: MSBuild@1
+    #   displayName: 'Build App Database'
+    #   inputs:
+    #     solution: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.WppDatabase/Wpp.StorageAutomation.WppDatabase.sqlproj'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: CopyFiles@2
+    #   displayName: 'Extract Database dacpac '
+    #   inputs:
+    #       CleanTargetFolder: false
+    #       SourceFolder: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.WppDatabase/bin/Release/'
+    #       Contents: '*.dacpac'
+    #       TargetFolder: '$(Build.ArtifactStagingDirectory)/Databases/Database'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+# # # Build Web App
+  
+#     - task: Npm@1
+#       displayName: 'WebApp npm install'
+#       inputs:
+#         workingDir: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+#         verbose: true
+#       condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+    
+#     - task: Npm@1
+#       displayName: 'WebApp npm build'
+#       inputs:
+#         command: custom
+#         workingDir: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+#         verbose: true
+#         customCommand: 'install env-cmd'
+#       condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: Npm@1
+    #   displayName: 'WebApp npm build $(env_poc)'
+    #   inputs:
+    #     command: custom
+    #     workingDir: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #     verbose: true
+    #     customCommand: 'run build-$(env_poc)'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: CopyFiles@2
+    #   displayName: Add Web route Config to $(env_poc)
+    #   inputs:
+    #       SourceFolder: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #       Contents: 'web.config'
+    #       TargetFolder: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+
+    # # Archive the files into a zip file for publishing
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive Web App'
+    #   inputs:
+    #     rootFolderOrFile: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #     archiveType: 'zip'
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/WebApps/WebApp_$(env_poc)_$(sequence).zip'
+    #     includeRootFolder: false
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+  
+    # - task: Npm@1
+    #   displayName: 'WebApp npm build $(env_dev)'
+    #   inputs:
+    #     command: custom
+    #     workingDir: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #     verbose: true
+    #     customCommand: 'run build-$(env_dev)'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: CopyFiles@2
+    #   displayName: Add Web route Config to $(env_dev)
+    #   inputs:
+    #       SourceFolder: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #       Contents: 'web.config'
+    #       TargetFolder: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+
+    # # Archive the files into a zip file for publishing
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive Web App'
+    #   inputs:
+    #     rootFolderOrFile: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #     archiveType: 'zip'
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/WebApps/WebApp_$(env_dev)_$(sequence).zip'
+    #     includeRootFolder: false
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: Npm@1
+    #   displayName: 'WebApp npm build $(env_test)'
+    #   inputs:
+    #     command: custom
+    #     workingDir: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #     verbose: true
+    #     customCommand: 'run build-$(env_test)'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: CopyFiles@2
+    #   displayName: Add Web route Config to $(env_test)
+    #   inputs:
+    #       SourceFolder: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #       Contents: 'web.config'
+    #       TargetFolder: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+
+    # # Archive the files into a zip file for publishing
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive Web App'
+    #   inputs:
+    #     rootFolderOrFile: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #     archiveType: 'zip'
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/WebApps/WebApp_$(env_test)_$(sequence).zip'
+    #     includeRootFolder: false
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+ 
+    # - task: Npm@1
+    #   displayName: 'WebApp npm build $(env_perf)'
+    #   inputs:
+    #     command: custom
+    #     workingDir: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #     verbose: true
+    #     customCommand: 'run build-$(env_perf)'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    # - task: CopyFiles@2
+    #   displayName: Add Web route Config to $(env_perf)
+    #   inputs:
+    #       SourceFolder: $(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp
+    #       Contents: 'web.config'
+    #       TargetFolder: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+
+    # # Archive the files into a zip file for publishing
+    # - task: ArchiveFiles@2
+    #   displayName: 'Archive Web App'
+    #   inputs:
+    #     rootFolderOrFile: '$(Build.SourceDirectory)/Solution/wpp.storageautomation.reactapp/build'
+    #     archiveType: 'zip'
+    #     archiveFile: '$(Build.ArtifactStagingDirectory)/WebApps/WebApp_$(env_perf)_$(sequence).zip'
+    #     includeRootFolder: false
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: CopyFiles@2
+      displayName: Copy WebApp
+      inputs:
+          SourceFolder: $(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.reactapp
+          Contents: '**'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)/WebApps/Solution'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+  ## APIs For APIM 
+    - task: CopyFiles@2
+      displayName: COPY API templates
+      inputs:
+          SourceFolder: $(Build.SourcesDirectory)/$(appDataTemplatePath)
+          TargetFolder: '$(Build.ArtifactStagingDirectory)/AppDataTemplate'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+#     # Publish Artifacts
+            
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifacts '
+      inputs:
+        ArtifactName: $(appArtifactsFolder)

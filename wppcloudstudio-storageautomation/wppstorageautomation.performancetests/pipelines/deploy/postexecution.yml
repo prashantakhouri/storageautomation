@@ -1,0 +1,47 @@
+jobs:
+
+  - job: job_get_stats_storageaccount
+    displayName: 'Get Size Stats of Production Stores under WIP & ARC Storage Accounts'
+    condition:  always()
+    pool:
+      vmImage: 'ubuntu-latest'    
+    steps:
+          - bash: |
+                set -eu #Error Resilience
+                #Log-In to Azure using SPN and set required AzureSubscription
+                az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+                az account set --subscription $(tf-subscription-id)
+                #Fetch storageAccountKeys
+                export storageAccountKeyWIP="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountWIP) --query '[0].value' -o tsv)"
+                export storageAccountKeyARC="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountARC) --query '[0].value' -o tsv)"
+                #sizeInGBConstant=1073741824
+                #Get Size of 'Production Stores' under 'storageAccountWIP'
+                if [[ $(az storage share list --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --query "[].name") != "[]" ]]; then
+                  echo ""
+                  echo "Starting to get size of 'Production Stores(file shares)' in GB(approx) under SA: $(storageAccountWIP)"
+                  az storage share list --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --query "[].name" --output tsv | xargs -L1 bash -ec 'az storage share stats --name $0 --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --output tsv'
+                  echo "Successfully fetched size statistics for Production Stores(file shares) under SA: $(storageAccountWIP)"
+                  echo ""
+                else
+                  echo ""
+                  echo 'No WIP Production Stores (file shares) found'
+                  echo ""
+                fi
+                #Get Size of 'Production Stores' under 'storageAccountARC'
+                if [[ $(az storage container list --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --query "[].name") != "[]" ]]; then 
+                  echo "Starting to get size of 'Production Stores(containers)' in bytes(exact) under SA: $(storageAccountARC)"
+                  az storage container list --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --query "[].name" --output tsv | xargs -L1 bash -ec 'az storage blob list --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --container-name $0 --query "[*].[properties.contentLength]" --output tsv |
+                  paste --serial --delimiters=+ | bc -l'
+                  echo "Successfully fetched size statistics for Production Stores(containers) under SA: $(storageAccountARC)"
+                  echo ""                  
+                else
+                  echo 'No ARC Production Stores (containers) found'
+                  echo ""
+                fi
+            name: getsizestatsproductionstoresstep    
+            displayName: 'Get Size Stats of Production Stores under WIP & ARC Storage Accounts'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)

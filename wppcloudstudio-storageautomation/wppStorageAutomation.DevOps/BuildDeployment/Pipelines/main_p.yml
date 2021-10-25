@@ -1,0 +1,42 @@
+name: WPP Cloud Studio Build Deployment
+
+variables:
+  - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/environment.yml
+  - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/package.yml
+  - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/infra.yml
+
+trigger: 
+ - Release1.0
+pr: none
+
+stages:
+    - stage: Startup
+      jobs:
+      - job: Initialize
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+        - script: echo 'Initialisation completed'
+
+    - stage: Build_App_Artifacts
+      jobs:
+        - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Stage/app.build.yml
+      dependsOn:
+      - Startup
+      condition: succeeded('Startup')
+
+
+    - stage: P_App_Deployment
+      variables:
+        - group: wppstorageautomationGroup-p
+        - group: "Cloud Studio Keyvault - p"
+        - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Variables/Values_p.yml
+      jobs:
+        - template: /wppStorageAutomation.DevOps/BuildDeployment/Pipelines/Templates/Stage/app.deploy.yml
+          parameters:
+            env: ${{ variables.env }}
+      dependsOn:
+      - Build_App_Artifacts
+      condition: succeeded('Build_App_Artifacts')
+
+    

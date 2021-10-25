@@ -1,0 +1,66 @@
+name: wppcs-datapopulation-scheduler-dev-pipeline
+
+trigger:  none
+
+schedules:
+- cron: "0 * * * Sun-Sat"
+  displayName: 'Sun-Sat Hourly Build'
+  branches:
+    include:
+    #- Sumit_S9_Perf
+    - tempBranch
+  always: true
+
+parameters:
+- name: environment
+  displayName: Choose 'Environment' to populate data at a scheduled frequency
+  type: string
+  default: d
+  values:
+  - d
+  - t
+- name: setupDataWIP
+  displayName: Setup 'WIP' data for 'Continuous Archival'?
+  type: boolean
+  default: true
+- name: runPostDataPopulationChecks
+  displayName: Whether fetch 'Production Stores' size statistics post data population? 
+  type: boolean 
+  default: false
+
+variables:
+  - name: env
+    value:  ${{parameters.environment}}
+  - name:  varRunPostDataPopulationChecks
+    value: ${{parameters.runPostDataPopulationChecks}}
+  - name: populateDataWIP
+    value: ${{parameters.setupDataWIP}}
+
+stages: 
+
+  - stage: stage_populate_data
+    displayName: Populate Data in WIP at a scheduled Frequency
+    variables:
+      - template: /wppstorageautomation.performancetests/pipelines/variables/configuration.yml
+      - template: /wppstorageautomation.performancetests/pipelines/variables/${{parameters.environment}}.yml
+      - group: wppstorageautomationGroup-${{parameters.environment}}
+      - group: Cloud Studio Keyvault - ${{parameters.environment}}
+    jobs:
+    - template: /wppstorageautomation.performancetests/pipelines/variables/populatewip.yml
+      parameters:
+        env: ${{variables.env}}
+        populateDataWIP: ${{variables.populateDataWIP}}        
+
+  - stage: stage_post_data_population
+    displayName: 'Fetch Production Store Size Statistics post data population'
+    variables:
+      - template: /wppstorageautomation.performancetests/pipelines/variables/configuration.yml
+      - template: /wppstorageautomation.performancetests/pipelines/variables/${{parameters.environment}}.yml
+      - group: wppstorageautomationGroup-${{parameters.environment}}
+      - group: Cloud Studio Keyvault - ${{parameters.environment}}
+    jobs:
+      - template: /wppstorageautomation.performancetests/pipelines/deploy/postexecution.yml
+        parameters:
+          env: ${{variables.env}}
+    dependsOn: stage_populate_data
+    condition: eq(variables.varRunPostDataPopulationChecks, true)

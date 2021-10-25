@@ -1,0 +1,89 @@
+variables:
+- name: githubConnection
+  value: wpp-cloud
+- name: userRepository
+  value: 'wpp-cloud/wppcloudstudio-storageautomation'
+- name: deployLocation
+  value: $(regionlocation)
+- name: regionShortName
+  value: $(regionShortName)
+- name: prefix
+  value: 'wppcs'
+- name: companyName
+  value: '${{ variables.prefix }}'
+- name: rgprefix
+  value: 'rg-${{ variables.prefix }}'
+- name: resMiddleName
+  value: '${{ variables.prefix }}-${{ variables.regionShortName }}-$(env)'
+- name: 'environmentName'
+  value: '$(env)'
+- name: environmentType
+  value: '$(env)'
+- name: suffix
+  value: '$(env)-$(sequence)'
+- name: resourceGroupDevOps
+  value: '$(rgprefix)-${{ variables.regionShortName }}-$(env)-csportal-$(sequence)'
+- name: sqlServerName
+  value: 'sql-${{ variables.resMiddleName }}-sql-$(sequence)'
+- name: sqlDbName
+  value: 'wppsqldb'
+- name: queuestorageaccount
+  value: 'sa${{ variables.prefix }}$(regionShortName)$(env)questand$(sequence)'
+- name: keyVaultName
+  value: 'kv-${{ variables.resMiddleName }}-kv-$(sequence)'
+- name:  keyVaultSqlDbConnectionKeyName
+  value: 'kv-connectionstring-sqldb'
+- name:  keyVaultStorageKeyNameWip
+  value: 'kv-sa-$(wipStorageAccount)'
+- name:  keyVaultStorageKeyNameArchive
+  value: 'kv-sa-$(archiveStorageAccount)'
+- name:  keyVaultStorageUri
+  value: 'kv-storage-keyvault-uri'
+- name:  keyVaultFuncAppDataMovementUri
+  value: 'kv-func-datamovement-uri'
+- name : keyVaultFuncAppDataMovementAppRegId
+  value : 'kv-func-datamovement-appreg-id'
+- name: keyVaultAuthserverAppUrl
+  value: 'kv-authserver-app-url'
+- name: keyVaultAuthserverAppOuthUrl
+  value: 'kv-authserver-app-oauth-url'
+- name: keyVaultAuthserverAppClientId
+  value: 'kv-authserver-app-clientid'
+- name: keyVaultSddlFullControlConfig
+  value: 'kv-sddl-fullcontrol-config'
+- name: keyVaultQueueSACS
+  value: 'kv-sa-$(queuestorageaccount)'
+- name: keyVaultQueueName
+  value: 'kv-queuestoragename'
+- name : keyVaultSddlCreateProduction
+  value : 'kv-sddl-create-production'
+- name : keyVaultSddlReadonlyMakeOffline
+  value : 'kv-sddl-readonly-makeoffline'
+- name : keyVaultGraphApiID
+  value : 'kv-graphapi-clientid'
+- name : keyVaultGraphApiSecret
+  value : 'kv-graphapi-clientsecret'
+- name : keyVaultGraphApiDomainName
+  value : 'kv-graphapi-domain'
+- name : keyVaultAPIMBaseURL
+  value : 'kv-apim-base-url'
+# - name:  keyVaultStorageKeyNameWip
+#   value: 'kv-connectionstring-wipstorageaccount-$(env)-$(sequence)'
+# - name:  keyVaultStorageKeyNameArchive
+#   value: 'kv-connectionstring-archivestorageaccount-$(env)-$(sequence)'
+- name: funcAppNameProductionControl
+  value: 'func-${{ variables.resMiddleName }}-prodcontroller-$(sequence)'
+- name: funcAppNameDataMovement
+  value: 'func-${{ variables.resMiddleName }}-datamovement-$(sequence)'
+- name: funcAppNameArchiveScheduler
+  value: 'func-${{ variables.resMiddleName }}-arcscheduler-$(sequence)'
+- name: funcAppNameProductionStore
+  value: 'func-${{ variables.resMiddleName }}-productionstore-$(sequence)'
+- name: funcAppNameArcQueueStorage
+  value: 'func-${{ variables.resMiddleName }}-arcqueuestorage-$(sequence)'
+- name: funcAppSPName
+  value: 'funcsp-${{ variables.resMiddleName }}-$(sequence)'
+- name: appinsightname
+  value: 'appi-${{ variables.resMiddleName }}-appinsights-$(sequence)'
+
+

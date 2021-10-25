@@ -1,0 +1,21 @@
+variables:
+# # COMMON ENV. VARIABLES
+# # - name: serviceConnection
+# #   value: 'wpp-cloudstudio-sandbox'
+- name: wpp-app-subscription-id
+  value: $(tf-subscription-id) 
+- name: wpp-app-subscription-clientid
+  value: $(wpp-it-cloudstudio-app-d-001-id)
+- name: wpp-app-subscription-clientsecret
+  value: $(wpp-it-cloudstudio-app-d-001-sec)
+- name: wpp-app-subscription-tenant-id
+  value: $(wpp-it-cloudstudio-tenant)
+- name: TerraformMasterModuleDirectoryName
+  value: 'wpp-core-infra'
+- name: locationshortprefix
+  value: 'neu'
+- name: location
+  value: 'northeurope'
+
+
+  

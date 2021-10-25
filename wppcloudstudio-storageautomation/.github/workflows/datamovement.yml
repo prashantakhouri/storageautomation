@@ -1,0 +1,37 @@
+name: Dev- Data Movement
+on: workflow_dispatch
+  # workflow_run:
+  #  workflows: ["Main"]
+  #  types:
+ #   - completed
+ # push:
+  #  branches:
+  #  - master
+env:
+  AZURE_FUNCTIONAPP_NAME: func-wpp-weu-dev-stau-dm-01
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: Wpp.StorageAutomation.DataMovement\published
+  AZURE_FUNCTIONAPP_PUBLISH_PROFILE: ${{ secrets.FUNC_WPP_WEU_DEV_STAU_DM_01_FFFF }}
+  CONFIGURATION: Release
+  DOTNET_CORE_VERSION: 3.1.x
+  WORKING_DIRECTORY: wppstorageautomation/src/wpp.storageautomation.DataMovement
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: ${{ env.DOTNET_CORE_VERSION }}
+    - name: Restore      
+      run: dotnet restore "${{ env.WORKING_DIRECTORY }}"
+    - name: Build
+      run: dotnet build "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-restore
+    - name: Publish
+      run: dotnet publish "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-build --output "${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}"
+    - name: Deploy to Azure Function App
+      uses: Azure/functions-action@v1
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+        publish-profile: ${{ env.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+        package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}

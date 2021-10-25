@@ -1,0 +1,33 @@
+# -- Master pipline for WPP Cloud Studio
+
+trigger: none
+pr: none
+
+name: WPP Cloud Studio  - ${{ parameters.Environment }}
+
+#-- Parameters
+parameters:
+- name: Environment
+  type: string
+  values:
+  - s
+
+
+- name: TerraformVersion
+  type: string
+  default: '1.0.2'
+
+#-- Varibales
+variables:
+- template: ./Environment_${{ parameters.Environment }}.yml
+- group: wppstorageautomationGroup-${{ parameters.Environment }}
+- group: Cloud Studio Keyvault - ${{ parameters.Environment }}
+
+stages:
+- template: ./terraform-stages-template.yml
+  parameters:
+    Environment: ${{ parameters.Environment }}
+    TerraformDirectory: ${{ variables.TerraformMasterModuleDirectoryName }}
+    TerraformVersion: ${{ parameters.TerraformVersion }}
+    location: ${{ variables.location }}
+    locationshortprefix: ${{ variables.locationshortprefix }}

@@ -1,0 +1,16 @@
+{
+  "stepAssemblies": [
+    {
+      "assembly": "Ocaramba"
+    },
+    {
+      "assembly": "Wpp.StorageAutomation.Tests"
+    },
+    {
+      "assembly": "Bdd.Core.Web"
+    },
+    {
+      "assembly": "Bdd.Core"
+    }
+  ]
+}

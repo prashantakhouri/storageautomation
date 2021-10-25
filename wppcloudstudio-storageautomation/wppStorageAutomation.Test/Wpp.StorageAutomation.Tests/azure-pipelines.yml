@@ -1,0 +1,161 @@
+# ADD STEPS THAT RUN TESTS, CREATE A NUGET PACKAGE, DEPLOY, AND MORE: https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+# YAML SCHEMA: https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=vsts&tabs=schema
+# PREDEFINED VARIABLES: https://docs.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=vsts
+# HOSTED AGENT SOFTWARES: https://github.com/Microsoft/azure-pipelines-image-generation/blob/master/images/win/Vs2017-Server2016-Readme.md
+
+# UNCOMMENT THE BELOW LINE TO DISABLE CI BUILDS
+trigger: none
+
+schedules:
+- cron: "30 23 * * Sun-Thu"
+  displayName: 'M-F 5:00 AM (UTC + 5:30) India daily build'
+  branches:
+    include:
+    - master
+  always: true
+
+parameters:
+  - name: Env
+    type: string
+    default: t
+    values:
+    - poc
+    - dev
+    - t
+
+  - name: UseLargeSizeProductionsForTesting
+    type: string
+    default: no
+    values:
+    - yes
+    - no
+
+variables:
+  - group: wppstorageautomationGroup-${{parameters.Env}}
+  - group: Cloud Studio Keyvault - ${{parameters.Env}}
+  - name: appName
+    value: 'Wpp.StorageAutomation.Tests'
+  - name: appPath
+    value: '$(System.DefaultWorkingDirectory)\wppStorageAutomation.Test\$(appName)' # NOTE: Change this to appropriate path based on your folder structure
+  - name: solution
+    value: '$(appPath)\$(appName).sln'
+  - name: buildPlatform
+    value: 'Any CPU'
+  - name: buildConfiguration
+    value: 'Release'
+  - name: binFolder
+    value: '$(appPath)\bin\$(buildConfiguration)'
+  - name: remotePlatform
+    value: 'Chrome'
+
+
+# https://docs.microsoft.com/en-us/azure/devops/pipelines/process/phases?view=vsts&tabs=yaml
+jobs:
+
+- job: 'Cleanup'
+  timeoutInMinutes: 0
+  pool:
+    vmImage: 'windows-latest' # name: 'Hosted VS2017'    
+  steps:
+    - template: azure-pipelines-bdd-jobs.yml  # Template reference
+      parameters:
+        env: '${{ parameters.Env }}'
+        testFiltercriteria: 'TestCategory=cleanup&TestCategory!=manual&TestCategory!=bddcore-wrapper&TestCategory!=ignore'
+        jobType: 'For Cleanup Tests'
+        useLargeSizeProductionsForTesting: '${{ parameters.UseLargeSizeProductionsForTesting }}'
+
+- job: 'TokenSetup'
+  timeoutInMinutes: 0
+  pool:
+    vmImage: 'windows-latest' # name: 'Hosted VS2017'
+  steps:
+  - template: azure-pipelines-bdd-jobs.yml  # Template reference
+    parameters:
+        env: '${{ parameters.Env }}'
+        testFiltercriteria: 'TestCategory=Token&TestCategory!=manual&TestCategory!=bddcore-wrapper&TestCategory!=ignore&TestCategory!=cleanup'
+        jobType: 'Fetching Access Token'
+        useLargeSizeProductionsForTesting: '${{ parameters.UseLargeSizeProductionsForTesting }}'
+  - task: PowerShell@2
+    name: 'FetchToken'
+    displayName: 'Fetching Access Token'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $token = Get-Content -Path $(Build.ArtifactStagingDirectory)/accesstoken.txt
+        Write-host "##vso[task.setvariable variable=accessToken;isOutput=true]$token"
+
+- job: 'TestSetup'
+  timeoutInMinutes: 0
+  dependsOn: 
+  - TokenSetup
+  - Cleanup
+  pool:
+    vmImage: 'windows-latest' # name: 'Hosted VS2017'
+  variables:
+    authToken: $[ dependencies.TokenSetup.outputs['FetchToken.accessToken'] ]
+  steps:
+  - script: echo 'Test-Setup'
+  - template: azure-pipelines-bdd-jobs.yml  # Template reference
+    parameters:
+        env: '${{ parameters.Env }}'
+        testFiltercriteria: 'TestCategory=copytestdata&TestCategory!=manual&TestCategory!=bddcore-wrapper&TestCategory!=ignore&TestCategory!=cleanup'
+        jobType: 'For Copying Test Data to WIP'
+        useLargeSizeProductionsForTesting: '${{ parameters.UseLargeSizeProductionsForTesting }}'
+
+- job: 'Run_API_Tests'
+  timeoutInMinutes: 0
+  dependsOn: 
+  - TokenSetup
+  - TestSetup
+  pool:
+    vmImage: 'windows-latest' # name: 'Hosted VS2017'
+  variables:
+    authToken: $[ dependencies.TokenSetup.outputs['FetchToken.accessToken'] ]
+  steps:
+    - template: azure-pipelines-bdd-jobs.yml  # Template reference
+      parameters:
+        env: '${{ parameters.Env }}'
+        testFiltercriteria: 'TestCategory=api&TestCategory!=Token&TestCategory!=manual&TestCategory!=bddcore-wrapper&TestCategory!=ignore&TestCategory!=cleanup'
+        jobType: 'For Running Automation API Tests'
+        useLargeSizeProductionsForTesting: '${{ parameters.UseLargeSizeProductionsForTesting }}'
+
+- job: 'Run_UI_Tests'
+  timeoutInMinutes: 0
+  dependsOn: 
+  - TokenSetup
+  - Run_API_Tests
+  pool:
+    vmImage: 'windows-latest' # name: 'Hosted VS2017'
+  strategy: # https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=vsts&tabs=schema#strategies
+    maxParallel: 1 #6
+    matrix:
+      Chrome:
+        remotePlatform: 'Chrome'
+      EdgeChrominium:
+        remotePlatform: 'EdgeChrominium'
+  variables:
+    authToken: $[ dependencies.TokenSetup.outputs['FetchToken.accessToken'] ]
+  steps:
+    - script: echo 'Token - $(authToken)'
+    - template: azure-pipelines-bdd-jobs.yml  # Template reference
+      parameters:
+        env: '${{ parameters.Env }}'
+        testFiltercriteria: 'TestCategory=ui&TestCategory!=api&TestCategory!=Token&TestCategory!=manual&TestCategory!=bddcore-wrapper&TestCategory!=ignore&TestCategory!=cleanup'
+        jobType: 'For Running Automation UI Tests in $(remotePlatform)'
+        useLargeSizeProductionsForTesting: '${{ parameters.UseLargeSizeProductionsForTesting }}'
+
+- job: 'Run_Backend_Tests'
+  timeoutInMinutes: 0
+  dependsOn: 
+  - Run_API_Tests
+  pool:
+    vmImage: 'windows-latest' # name: 'Hosted VS2017'
+  variables:
+    authToken: $[ dependencies.TokenSetup.outputs['FetchToken.accessToken'] ]
+  steps:
+    - template: azure-pipelines-bdd-jobs.yml  # Template reference
+      parameters:
+        env: '${{ parameters.Env }}'
+        testFiltercriteria: 'TestCategory=backend&TestCategory!=Token&TestCategory!=manual&TestCategory!=bddcore-wrapper&TestCategory!=ignore&TestCategory!=cleanup'
+        jobType: 'For Running Backend Automation Tests'
+        useLargeSizeProductionsForTesting: '${{ parameters.UseLargeSizeProductionsForTesting }}'

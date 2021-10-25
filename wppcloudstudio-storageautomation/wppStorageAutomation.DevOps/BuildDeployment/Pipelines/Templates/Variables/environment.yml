@@ -1,0 +1,13 @@
+variables:
+- name: env_d
+  value: 'd'
+- name: env_t
+  value: 't'
+- name: env_perf
+  value: 'perf'
+- name: env_poc
+  value: 'poc'
+- name: env_s
+  value: 's'
+- name: env_p
+  value: 'p'

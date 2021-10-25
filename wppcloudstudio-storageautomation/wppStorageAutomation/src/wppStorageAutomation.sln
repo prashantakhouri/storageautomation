@@ -1,0 +1,86 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31313.79
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.Common", "wpp.storageautomation.Common\Wpp.StorageAutomation.Common.csproj", "{724123FA-056E-4CD0-97F4-3D69A23DA75F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.DataMovement", "wpp.storageautomation.DataMovement\Wpp.StorageAutomation.DataMovement.csproj", "{F59DF9D4-1657-4CC7-9328-7BE5B522CC03}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{397898DD-33D0-4F1B-A21A-EF7E4E51F586}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.UnitTests", "Wpp.StorageAutomation.UnitTests\Wpp.StorageAutomation.UnitTests.csproj", "{250DB428-7956-4D28-9900-2DB377648602}"
+EndProject
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "Wpp.StorageAutomation.WppDatabase", "wpp.storageautomation.WppDatabase\Wpp.StorageAutomation.WppDatabase.sqlproj", "{F34D2A94-95AD-41F8-8AA4-602AE4F34149}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.Entities", "Wpp.StorageAutomation.Entities\Wpp.StorageAutomation.Entities.csproj", "{2A6E709B-2F45-4B01-BE5D-FBE925D3DAF2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.ArchiveScheduler", "Wpp.StorageAutomation.ArchiveScheduler\Wpp.StorageAutomation.ArchiveScheduler.csproj", "{A97E4A07-FEE7-4631-AB2E-3779D0247126}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.Security", "Wpp.StorageAutomation.Security\Wpp.StorageAutomation.Security.csproj", "{0F2452CB-6C84-48B5-B0D0-461ECFB1790A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.Production", "Wpp.StorageAutomation.Production\Wpp.StorageAutomation.Production.csproj", "{111A5A46-B7B8-43FF-A88F-7619A3E1A50D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wpp.StorageAutomation.ProductionStore", "Wpp.StorageAutomation.ProductionStore\Wpp.StorageAutomation.ProductionStore.csproj", "{38FBB95F-2074-4A03-BD98-F0DD44DE7267}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wpp.StorageAutomation.ArchiveQueueStorage", "Wpp.StorageAutomation.ArchiveQueueStorage\Wpp.StorageAutomation.ArchiveQueueStorage.csproj", "{D7F63EE3-E251-4447-8047-DC51E7668A1B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{724123FA-056E-4CD0-97F4-3D69A23DA75F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{724123FA-056E-4CD0-97F4-3D69A23DA75F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{724123FA-056E-4CD0-97F4-3D69A23DA75F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{724123FA-056E-4CD0-97F4-3D69A23DA75F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F59DF9D4-1657-4CC7-9328-7BE5B522CC03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F59DF9D4-1657-4CC7-9328-7BE5B522CC03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F59DF9D4-1657-4CC7-9328-7BE5B522CC03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F59DF9D4-1657-4CC7-9328-7BE5B522CC03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{250DB428-7956-4D28-9900-2DB377648602}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{250DB428-7956-4D28-9900-2DB377648602}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{250DB428-7956-4D28-9900-2DB377648602}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{250DB428-7956-4D28-9900-2DB377648602}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F34D2A94-95AD-41F8-8AA4-602AE4F34149}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F34D2A94-95AD-41F8-8AA4-602AE4F34149}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F34D2A94-95AD-41F8-8AA4-602AE4F34149}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{F34D2A94-95AD-41F8-8AA4-602AE4F34149}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F34D2A94-95AD-41F8-8AA4-602AE4F34149}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F34D2A94-95AD-41F8-8AA4-602AE4F34149}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{2A6E709B-2F45-4B01-BE5D-FBE925D3DAF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A6E709B-2F45-4B01-BE5D-FBE925D3DAF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A6E709B-2F45-4B01-BE5D-FBE925D3DAF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A6E709B-2F45-4B01-BE5D-FBE925D3DAF2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A97E4A07-FEE7-4631-AB2E-3779D0247126}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A97E4A07-FEE7-4631-AB2E-3779D0247126}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A97E4A07-FEE7-4631-AB2E-3779D0247126}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A97E4A07-FEE7-4631-AB2E-3779D0247126}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F2452CB-6C84-48B5-B0D0-461ECFB1790A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F2452CB-6C84-48B5-B0D0-461ECFB1790A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F2452CB-6C84-48B5-B0D0-461ECFB1790A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F2452CB-6C84-48B5-B0D0-461ECFB1790A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{111A5A46-B7B8-43FF-A88F-7619A3E1A50D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{111A5A46-B7B8-43FF-A88F-7619A3E1A50D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{111A5A46-B7B8-43FF-A88F-7619A3E1A50D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{111A5A46-B7B8-43FF-A88F-7619A3E1A50D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38FBB95F-2074-4A03-BD98-F0DD44DE7267}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38FBB95F-2074-4A03-BD98-F0DD44DE7267}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38FBB95F-2074-4A03-BD98-F0DD44DE7267}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38FBB95F-2074-4A03-BD98-F0DD44DE7267}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7F63EE3-E251-4447-8047-DC51E7668A1B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7F63EE3-E251-4447-8047-DC51E7668A1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7F63EE3-E251-4447-8047-DC51E7668A1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7F63EE3-E251-4447-8047-DC51E7668A1B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {77081E9B-3C66-4737-8D1F-9AD09087F5C7}
+	EndGlobalSection
+EndGlobal

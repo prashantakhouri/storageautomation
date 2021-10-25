@@ -1,0 +1,25 @@
+variables:
+# COMMON ENV. VARIABLES
+- name: wpp-app-subscription-id
+  value: $(tf-subscription-id)
+- name: wpp-app-subscription-clientid
+  value: $(wpp-it-cloudstudio-app-d-001-id)
+- name: wpp-app-subscription-clientsecret
+  value: $(wpp-it-cloudstudio-app-d-001-sec)
+- name: wpp-app-subscription-tenant-id
+  value: $(wpp-it-cloudstudio-tenant)
+- name: env
+  value: $(env_poc)
+- name: regionShortName
+  value: 'neu'
+- name: regionlocation
+  value: 'NorthEurope'
+ ## WebAPPName
+- name: webAppName
+  value: 'wppcs-cloudstudioportal-$(env)-$(sequence)'
+- name: apiManagementName
+  value: 'apim-wppcs-$(regionShortName)-$(env_poc)-apigateway-$(sequence)'
+- name:  wipStorageAccount
+  value: 'sawppcs$(regionShortName)$(env_poc)wipstand01'
+- name:  archiveStorageAccount
+  value: 'sawppcs$(regionShortName)$(env_poc)arcstand01'

@@ -1,0 +1,4 @@
+jobs:
+ - template: ../Deploy/app.deploy.yml
+   parameters:
+     env: ${{parameters.env}}

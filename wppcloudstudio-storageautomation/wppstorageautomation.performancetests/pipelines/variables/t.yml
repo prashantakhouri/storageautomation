@@ -1,0 +1,24 @@
+#sawppcsneutp1; sawppcsneutb1; sql-wppcs-neu-t-sql-01; rg-wppcs-neu-t-data-01
+variables:
+- name: env
+  value: 't'
+- name: commonTestEnv
+  value: 't'
+- name: hostnameWPPSA 
+  value: '$(hostnameStaticPrefix)-$(project)-$(regionShortNameNEU)-$(env)-$(hostnameStaticSuffix)'
+- name: storageAccountWIP
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(storageAccountNameTest)$(storageAccountTypeFSPremium)$(sequenceSA)'
+- name: storageAccountARC
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(storageAccountNameTest)$(storageAccountTypeBlob)$(sequenceSA)'
+- name: sqlServerName
+  value: '$(resourceTypeSQL)-$(project)-$(regionShortNameNEU)-$(env)-$(resourceTypeSQL)-$(sequence)'
+- name: resourceGroupName
+  value: '$(resourceGroupPrefix)-$(project)-$(regionShortNameNEU)-$(env)-$(resourceGroupStaticName)-$(sequence)'
+- name: sampleDataSourceStorageAccountName
+  value: '$(resourceTypeSA)$(project)$(regionShortNameNEU)$(commonTestEnv)datastore'
+- name: sampleDataSourceResourceGroupName
+  value: '$(resourceGroupPrefix)-$(project)-$(regionShortNameNEU)-$(commonTestEnv)-datamanagement'
+- name: clientId
+  value: $(wpp-it-cloudstudio-app-t-001-id)
+- name: clientSecret
+  value: $(wpp-it-cloudstudio-app-t-001-sec)

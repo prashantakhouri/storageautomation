@@ -1,0 +1,259 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <NoWarn>SA0001;SA1600;S125</NoWarn>
+    <WarningsAsErrors />
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DebugType>pdbonly</DebugType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="TestData\Input\Credentials.xlsx" />
+    <None Remove="TestData\Input\ElementStyles.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="stylecop.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="TestData\Input\Credentials.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\Input\ElementStyles.yml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <SpecFlowGeneratorPlugins Include="$(_BddCoreGeneratorPluginPath)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.8.4" />
+    <PackageReference Include="Azure.Storage.Files.Shares" Version="12.6.2" />
+    <PackageReference Include="Bdd.Core.Generator.SpecFlowPlugin" Version="3.1.3-preview" />
+    <PackageReference Include="Bdd.Core.Web" Version="3.1.3-preview" />
+    <PackageReference Include="Bdd.Core.Api" Version="3.1.3-preview" />
+    <PackageReference Include="FluentAssertions" Version="5.10.3" />
+    <PackageReference Include="Microsoft.Azure.Storage.Blob" Version="11.2.3" />
+    <PackageReference Include="Microsoft.Azure.Storage.DataMovement" Version="2.0.4" />
+    <PackageReference Include="Microsoft.Edge.SeleniumTools" Version="3.141.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
+    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="94.0.4606.6100" />
+    <PackageReference Include="Selenium.WebDriver.GeckoDriver" Version="0.29.1" />
+    <PackageReference Include="Selenium.WebDriver.GeckoDriver.Win64" Version="0.29.1" />
+    <PackageReference Include="Selenium.WebDriver.IEDriver" Version="3.150.1.2" />   
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
+    <PackageReference Include="MSTest.TestAdapter" Version="2.2.3" />
+    <PackageReference Include="NUnit.ConsoleRunner" Version="3.12.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="3.17.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Selenium.WebDriver.MSEdgeDriver" Version="92.0.902.73" />
+    <PackageReference Include="SpecFlow.NUnit" Version="3.8.7" />
+  </ItemGroup>
+
+  <!--<Analyzers>-->
+  <ItemGroup>
+    <PackageReference Include="SecurityCodeScan.VS2019" Version="5.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="8.22.0.31243">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.333">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="5.0.0" />
+    <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+    <PackageReference Include="WindowsAzure.Storage" Version="9.3.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Features\API\DeleteAProduction.feature.cs">
+      <DependentUpon>DeleteAProduction.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Features\API\MakeAProductionOffline.feature.cs">
+      <DependentUpon>MakeAProductionOffline.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Features\Backend\ACLOnProduction.feature.cs">
+      <DependentUpon>ACLOnProduction.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Features\Backend\ScheduleArchiveAProduction.feature.cs">
+      <DependentUpon>ScheduleArchiveAProduction.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Features\Web\DeleteProductionUI.feature.cs">
+      <DependentUpon>DeleteProductionUI.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Features\Web\MakeProductionOfflineUI.feature.cs">
+      <DependentUpon>MakeProductionOfflineUI.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Features\Web\FilterAndSortProductions.feature.cs">
+      <DependentUpon>FilterAndSortProductions.feature</DependentUpon>
+    </Compile>
+    <Compile Update="Properties\APIRoutes.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>APIRoutes.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Properties\UserGroupDetails.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>UserGroupDetails.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\APIRoutes.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>APIRoutes.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\UserGroupDetails.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>UserGroupDetails.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="TestData\Before\" />
+    <Folder Include="TestData\After\" />
+    <Folder Include="TestData\Output\" />
+    <Folder Include="TestOutput\Screenshots\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="accesstoken.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="appSettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Spex.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiRequestBody\AddUser.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiRequestBody\CreateAProductionStore.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiRequestBody\CreateProduction.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiRequestBody\RestoreProduction.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiResponseBody\CreateAProductionStore.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiResponseBody\CreateProduction.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\ApiResponseBody\CreateUser.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\TestFiles\DummyTestFile2.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\TestFiles\DummyTestFile.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="wpp.storageautomation.Tests.poc.runsettings">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="wpp.storageautomation.Tests.t.runsettings">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Wpp.storageAutomation.Tests.Dev.runsettings">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SpecFlow.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Spex\**" />
+    <EmbeddedResource Remove="Spex\**" />
+    <None Remove="Spex\**" />
+    <SpecFlowFeatureFiles Remove="Spex\**" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Spex\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\API\MakeAProductionOffline - Copy.feature.cs" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\API\RestoreProduction - Copy.feature.cs" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\Backend\ArchiveAProduction.feature.cs" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\Backend\ScheduleArchiveAProduction - Copy.feature.cs" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\Web\MakeProductionOfflineUI - Copy.feature.cs" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\Web\RestoreProductionUI - Copy.feature.cs" />
+    <SpecFlowObsoleteCodeBehindFiles Remove="Features\Web\UxForFileSizeUnitsInListOfProductions - Copy.feature.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SpecFlowFeatureFiles Update="Features\API\DeleteAProduction.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+    <SpecFlowFeatureFiles Update="Features\API\MakeAProductionOffline.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+    <SpecFlowFeatureFiles Update="Features\Backend\ACLOnProduction.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+    <SpecFlowFeatureFiles Update="Features\Backend\ScheduleArchiveAProduction.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+    <SpecFlowFeatureFiles Update="Features\Web\DeleteProductionUI.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+    <SpecFlowFeatureFiles Update="Features\Web\MakeProductionOfflineUI.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+    <SpecFlowFeatureFiles Update="Features\Web\FilterAndSortProductions.feature">
+      <Visible>$(UsingMicrosoftNETSdk)</Visible>
+      <CodeBehindFile>%(RelativeDir)%(Filename).feature$(DefaultLanguageSourceExtension)</CodeBehindFile>
+    </SpecFlowFeatureFiles>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <ShowTrace>true</ShowTrace>
+    <OverwriteReadOnlyFiles>true</OverwriteReadOnlyFiles>
+    <ForceGeneration>true</ForceGeneration>
+    <VerboseOutput>true</VerboseOutput>
+  </PropertyGroup>
+
+  <!--<Import Project="%userprofile%\.nuget\packages\SpecFlow\2.4.0\tools\TechTalk.SpecFlow.tasks" Condition="Exists('%userprofile%\.nuget\packages\SpecFlow\2.4.0\tools\TechTalk.SpecFlow.tasks')" />
+  <Import Project="%userprofile%\.nuget\packages\SpecFlow\2.4.0\tools\TechTalk.SpecFlow.targets" Condition="Exists('%userprofile%\.nuget\packages\SpecFlow\2.4.0\tools\TechTalk.SpecFlow.targets')" />-->
+
+  <Target Name="AfterUpdateFeatureFilesInProject">
+    <ItemGroup>
+      <Compile Include="Features\**\*.feature.cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>

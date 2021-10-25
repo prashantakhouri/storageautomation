@@ -1,0 +1,9 @@
+variables:
+- name: infraArtifactsFolder
+  value: 'InfraArtifacts'
+- name: appArtifactsFolder
+  value: 'DropAppArtifacts'
+- name: infraScriptPath
+  value: '/wppStorageAutomation.DevOps/BuildDeployment/Scripts'
+- name: appDataTemplatePath
+  value: '/wppStorageAutomation.DevOps/BuildDeployment/AppDataTemplates'

@@ -1,0 +1,4 @@
+{
+  "ProductionStoreUri": "//${productionStoreSmallContainer}/",
+  "ProductionUri": "//${productionStoreSmallContainer}/${productionSmall}/"
+}

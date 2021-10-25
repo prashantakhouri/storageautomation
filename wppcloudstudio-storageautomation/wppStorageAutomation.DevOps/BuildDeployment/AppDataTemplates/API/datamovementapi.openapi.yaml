@@ -1,0 +1,95 @@
+openapi: 3.0.1
+info:
+  title: datamovementapi
+  description: Import from $(funcAppNameDataMovement) Function App
+  version: '1.0'
+servers:
+  - url: https://$(apiManagementName).azure-api.net/datamovement
+paths:
+  '/production-stores/{productionStoreId}/productions/{productionId}/archive':
+    post:
+      summary: ArchiveProduction
+      operationId: post-archiveproduction
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+        - name: productionId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  '/production-stores/{productionStoreId}/productions/{productionId}/restore':
+    post:
+      summary: RestoreProduction
+      operationId: post-restoreproduction
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+        - name: productionId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  '/production-stores/{productionStoreId}/productions/archive':
+    post:
+      summary: ArchiveProductionStore
+      operationId: post-archiveproductionstore
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  '/production-stores/{productionStoreId}/productions/{productionId}/make-offline':
+    post:
+      summary: MakeProductionOffline
+      operationId: post-makeproductionoffline
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+        - name: productionId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  /production-stores/archive:
+    post:
+      summary: Archive
+      operationId: post-archive
+      responses:
+        '200':
+          description: 
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]

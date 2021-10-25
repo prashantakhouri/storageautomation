@@ -1,0 +1,135 @@
+﻿jobs:
+   
+  - job: BuildAppArtifacts
+    pool:
+     vmImage: 'windows-latest'
+
+    steps:
+
+   
+    # For Debug (copy solution) - later comment this copy task 
+    # - task: CopyFiles@2
+    #   displayName: 'Retrieve Project Solution'
+    #   inputs:
+    #       CleanTargetFolder: false
+    #       SourceFolder: '$(Build.SourcesDirectory)/wppStorageAutomation/src/'
+    #       Contents: '**'
+    #       TargetFolder: '$(Build.SourceDirectory)/Solution'
+    #   condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+#     # Build Function Apps 
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build ProductionStore'
+      inputs:
+        projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.ProductionStore/Wpp.StorageAutomation.ProductionStore.csproj'
+        arguments: '--output publish_output_ps --configuration Release'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive ProductionStore'
+      inputs:
+        rootFolderOrFile: 'publish_output_ps/'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/ProductionStore.zip'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build Production'
+      inputs:
+        projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.Production/Wpp.StorageAutomation.Production.csproj'
+        arguments: '--output publish_output_pc --configuration Release'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive Production'
+      inputs:
+        rootFolderOrFile: 'publish_output_pc/'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/Production.zip'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build DataMovement'
+      inputs:
+        projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.DataMovement/Wpp.StorageAutomation.DataMovement.csproj'
+        arguments: '--output publish_output_dm --configuration Release'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive DataMovement'
+      inputs:
+        rootFolderOrFile: 'publish_output_dm/'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/DataMovement.zip'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build ArchiveScheduler'
+      inputs:
+        projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.ArchiveScheduler/Wpp.StorageAutomation.ArchiveScheduler.csproj'
+        arguments: '--output publish_output_arcsch --configuration Release'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive ArchiveScheduler'
+      inputs:
+        rootFolderOrFile: 'publish_output_arcsch/'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/ArchiveScheduler.zip'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build ArchiveQueueStorage'
+      inputs:
+        projects: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.ArchiveQueueStorage/Wpp.StorageAutomation.ArchiveQueueStorage.csproj'
+        arguments: '--output publish_output_arcque --configuration Release'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive ArchiveQueueStorage'
+      inputs:
+        rootFolderOrFile: 'publish_output_arcque/'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/FunctionApps/ArchiveQueueStorage.zip'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+# # # Build Database
+
+    - task: MSBuild@1
+      displayName: 'Build App Database'
+      inputs:
+        solution: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.WppDatabase/Wpp.StorageAutomation.WppDatabase.sqlproj'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: CopyFiles@2
+      displayName: 'Extract Database dacpac '
+      inputs:
+          CleanTargetFolder: false
+          SourceFolder: '$(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.WppDatabase/bin/Release/'
+          Contents: '*.dacpac'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)/Databases/Database'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+    - task: CopyFiles@2
+      displayName: Copy WebApp
+      inputs:
+          SourceFolder: $(Build.SourcesDirectory)/wppStorageAutomation/src/wpp.storageautomation.reactapp
+          Contents: '**'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)/WebApps/Solution'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+  ## APIs For APIM 
+    - task: CopyFiles@2
+      displayName: COPY API templates
+      inputs:
+          SourceFolder: $(Build.SourcesDirectory)/$(appDataTemplatePath)
+          TargetFolder: '$(Build.ArtifactStagingDirectory)/AppDataTemplate'
+      condition: and(succeeded(), eq('${{parameters.app}}', 'true'))
+
+#     # Publish Artifacts
+            
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifacts '
+      inputs:
+        ArtifactName: $(appArtifactsFolder)

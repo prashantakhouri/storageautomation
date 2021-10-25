@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "wpp.storageautomation.ProductionControl": {
+      "commandName": "Project",
+      "environmentVariables": {
+      }
+    }
+  }
+}

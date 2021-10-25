@@ -1,0 +1,69 @@
+parameters:
+  - name: env
+    type: string
+
+  - name: testFiltercriteria
+    type: string
+
+  - name: jobType
+    type: string
+
+  - name: useLargeSizeProductionsForTesting
+    type: string
+
+
+# https://docs.microsoft.com/en-us/azure/devops/pipelines/process/phases?view=vsts&tabs=yaml
+steps:
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'restore'
+      projects: '$(appPath)\$(appName).csproj'
+      feedsToUse: 'select'
+      vstsFeed: 'e793ff43-5be4-4632-8783-0512f3d4b90e'
+
+  - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore
+    displayName: 'DOTNET BUILD'
+
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: 'wppStorageAutomation.Test/Wpp.StorageAutomation.Tests/bin/$(buildConfiguration)'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/Wpp.StorageAutomation.Tests.zip'
+      replaceExistingArchive: true
+
+  # https://docs.microsoft.com/en-us/azure/devops/pipelines/tasks/test/vstest?view=azure-devops
+  - task: VSTest@2
+    displayName: RUN TESTS
+    continueOnError: true
+    inputs:
+      platform: '$(buildPlatform)'
+      configuration: '$(buildConfiguration)'
+      testSelector: 'testAssemblies' # Options: testAssemblies, testPlan, testRun
+      testAssemblyVer2: '$(binFolder)\$(appName).dll'
+      runSettingsFile: '$(binFolder)\$(appName).${{ parameters.env }}.runsettings'
+      testFiltercriteria: "${{ parameters.testFiltercriteria }}"
+      runOnlyImpactedTests: false
+      runInParallel: false
+      pathtoCustomTestAdapters: '$(binFolder)'
+      diagnosticsEnabled: false # Optional
+      searchFolder: '$(binFolder)'
+      uiTests: true
+      publishRunAttachments: true
+      overrideTestrunParameters: -appSettings.Token $(authToken) -appSettings.browser $(remotePlatform) -keyVault.ClientId $(wpp-it-cloudstudio-app-t-001-id) -keyVault.ClientSecret $(wpp-it-cloudstudio-app-t-001-sec) -database.DbUser $(${{ parameters.env }}DbUser) -database.DbPwd $(${{ parameters.env }}DbPwd) -testDataStorage.UseLargeSizeProductionsForTesting ${{ parameters.useLargeSizeProductionsForTesting }} -storageAccountDetails.sa_TestData_Key $(sa-testdatasetup)
+
+  - task: CopyFiles@2
+    displayName: Copy Output
+    inputs:
+      contents: | 
+                $(binFolder)\TestOutput\**\*.*
+                $(binFolder)\accesstoken.txt
+      targetFolder: $(Build.ArtifactStagingDirectory)
+      overWrite: true
+      flattenFolders: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Output
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory) # '$(Pipeline.Workspace)'
+      artifact: 'TestOutput_${{ parameters.jobType }}'

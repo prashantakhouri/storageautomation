@@ -1,0 +1,596 @@
+jobs:
+
+  - job: job_delete_data_storageaccount_wip
+    displayName: 'Delete File Shares from WIP Storage Account'
+    condition:  or(eq('${{ parameters.deleteAndPopulateDataWIP }}', 'true'),eq('${{ parameters.deleteDataWIP }}', 'true'))    
+    pool:
+      vmImage: 'ubuntu-latest'    
+    steps:
+          - bash: |
+                set -eu #Error Resilience
+                #Log-In to Azure using SPN and set required AzureSubscription
+                az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+                az account set --subscription $(tf-subscription-sa-id)
+                #Fetch storageAccountKeyWIP
+                export storageAccountKeyWIP="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountWIP) --query '[0].value' -o tsv)"
+                #Delete all 'Production Stores' under 'storageAccountWIP'
+                if [[ $(az storage share list --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --query "[].name") != "[]" ]]; then
+                  echo "Starting with 'Purge' of all Production Stores(file shares) in $(storageAccountWIP)"
+                  az storage share list --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --query "[].name" --output tsv | xargs -L1 bash -ec 'az storage share delete --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --name $0 --delete-snapshots include --output none'
+                  echo "Completed purging all Production Stores(file shares) in $(storageAccountWIP)"
+                else
+                  echo 'No file shares found for purging' 
+                fi
+            name: deleteproductionstoresstepWIP    
+            displayName: 'Purge Production Stores(file shares) in WIP Storage Account'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+
+  - job: job_populate_data_storageaccount_wip
+    displayName: 'Populate WIP Storage Account(File Shares)'
+    condition:  or(eq('${{ parameters.deleteAndPopulateDataWIP }}', 'true'),eq('${{ parameters.populateDataWIP }}', 'true'))
+    dependsOn: ['job_delete_data_storageaccount_wip']
+    pool:
+      vmImage: 'ubuntu-latest'    
+    steps:
+          - bash: |
+                set -eu #Error Resilience
+                #Global Variables
+                varProductionStores=""
+                varProductions=""
+                queryProductionStores=""
+                queryProductions=""
+                varDeltaProductionStores=""
+                varDeltaProductions=""
+                queryDeltaProductionStores=""
+                queryDeltaProductions=""
+                #Function to Log-In to Azure using SPN and fetch storageAccountKeyWIP
+                function LoginAndFetchAccountKey(){
+                az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+                az account set --subscription $(tf-subscription-sa-id)
+                #Fetch storageAccountKeyWIP
+                export sampleDataSourceStorageAccountKey="$(az storage account keys list -g $(sampleDataSourceResourceGroupName) -n $(sampleDataSourceStorageAccountName) --query '[0].value' -o tsv)"
+                export storageAccountKeyWIP="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountWIP) --query '[0].value' -o tsv)"
+                }
+                #Function to Create Production(s) within a 'Production Store' 
+                function CreateProductionSML(){
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameSmall" --name "$productionSmall" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameSmall" --name "$productionSmall/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameMedium" --name "$productionMedium" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameMedium" --name "$productionMedium/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameLarge" --name "$productionLarge" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameLarge" --name "$productionLarge/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$prodStoreSmallMOPName" --name "$productionSmallMOP" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$prodStoreSmallMOPName" --name "$productionSmallMOP/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$prodStoreMediumMOPName" --name "$productionMediumMOP" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$prodStoreMediumMOPName" --name "$productionMediumMOP/$(subproductionVideo)" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$prodStoreLargeMOPName" --name "$productionLargeMOP" --output none
+                  az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$prodStoreLargeMOPName" --name "$productionLargeMOP/$(subproductionVideo)" --output none
+                  echo "Iteration $i: S/M/L Production(s) created successfully"
+                }
+                if [[ $(boolCreateSMLProductionStores) == "true" ]]; then
+                  #LoginAndFetchAccountKey() Function Invoke
+                  LoginAndFetchAccountKey
+                  echo "Number of WIP(file shares for 'ArchivePS' & 'MakeOfflineProd') Production Stores(in multiples of 6 - 2Small[1GB],2Medium[5GB]&2Large[25GB]) to be created: $(numberOfProductionStoresWIP)"
+                  for ((i=1;i<=$(numberOfProductionStoresWIP);i++));               
+                  do
+                    #Dynamic Variables
+                    guid=$(uuidgen)
+                    ticks=$(date +%s%3N)
+                    #'ArchiveProductionStore' Scenarios
+                    productionStoreNameSmall=$(productionStoreStaticWIP)-$(productionStoreSmall)-$(date +%F)-$ticks
+                    productionStoreSmallGUID=$(uuidgen)
+                    productionStoreNameMedium=$(productionStoreStaticWIP)-$(productionStoreMedium)-$(date +%F)-$ticks
+                    productionStoreMediumGUID=$(uuidgen)
+                    productionStoreNameLarge=$(productionStoreStaticWIP)-$(productionStoreLarge)-$(date +%F)-$ticks
+                    productionStoreLargeGUID=$(uuidgen)
+                    productionSmall=$(productionSmallWIP)_$guid
+                    productionMedium=$(productionMediumWIP)_$guid
+                    productionLarge=$(productionLargeWIP)_$guid
+                    #'MakeOfflineProduction' Scenarios
+                    prodStoreSmallMOPName=$(productionStoreStaticMOP)-$(productionStoreSmall)-$(date +%F)-$ticks
+                    prodStoreSmallMOPGUID=$(uuidgen)
+                    prodStoreMediumMOPName=$(productionStoreStaticMOP)-$(productionStoreMedium)-$(date +%F)-$ticks
+                    prodStoreMediumMOPGUID=$(uuidgen)
+                    prodStoreLargeMOPName=$(productionStoreStaticMOP)-$(productionStoreLarge)-$(date +%F)-$ticks
+                    prodStoreLargeMOPGUID=$(uuidgen)
+                    productionSmallMOP=$(productionSmallMakeOffline)_$guid
+                    productionMediumMOP=$(productionMediumMakeOffline)_$guid
+                    productionLargeMOP=$(productionLargeMakeOffline)_$guid
+                    #SQL DML Statements
+                    varProductionStores+="INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreSmallGUID', '$productionStoreNameSmall','North Europe','\\$productionStoreNameSmall',$(sqlAllocatedSize),'\\$productionStoreNameSmall',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreMediumGUID', '$productionStoreNameMedium','North Europe','\\$productionStoreNameMedium',$(sqlAllocatedSize),'\\$productionStoreNameMedium',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreLargeGUID', '$productionStoreNameLarge','North Europe','\\$productionStoreNameLarge',$(sqlAllocatedSize),'\\$productionStoreNameLarge',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$prodStoreSmallMOPGUID', '$prodStoreSmallMOPName','North Europe','\\$prodStoreSmallMOPName',$(sqlAllocatedSize),'\\$prodStoreSmallMOPName',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$prodStoreMediumMOPGUID', '$prodStoreMediumMOPName','North Europe','\\$prodStoreMediumMOPName',$(sqlAllocatedSize),'\\$prodStoreMediumMOPName',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$prodStoreLargeMOPGUID', '$prodStoreLargeMOPName','North Europe','\\$prodStoreLargeMOPName',$(sqlAllocatedSize),'\\$prodStoreLargeMOPName',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');"
+                    varProductions+="INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionSmall', '$productionStoreSmallGUID','/$productionStoreNameSmall/$productionSmall', NULL, '/$productionStoreNameSmall/$productionSmall', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionMedium', '$productionStoreMediumGUID','/$productionStoreNameMedium/$productionMedium', NULL, '/$productionStoreNameMedium/$productionMedium', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionLarge', '$productionStoreLargeGUID','/$productionStoreNameLarge/$productionLarge', NULL, '/$productionStoreNameLarge/$productionLarge', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionSmallMOP', '$prodStoreSmallMOPGUID','/$prodStoreSmallMOPName/$productionSmallMOP', NULL, '/$prodStoreSmallMOPName/$productionSmallMOP', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionMediumMOP', '$prodStoreMediumMOPGUID','/$prodStoreMediumMOPName/$productionMediumMOP', NULL, '/$prodStoreMediumMOPName/$productionMediumMOP', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionLargeMOP', '$prodStoreLargeMOPGUID','/$prodStoreLargeMOPName/$productionLargeMOP', NULL, '/$prodStoreLargeMOPName/$productionLargeMOP', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);"                    
+                    echo "############################################# New Iteration STARTS Here #############################################"                    
+                    echo $varProductionStores
+                    echo $varProductions
+                    echo ""               
+                    echo "Iteration $i: Going ahead with creation of 'S/M/L Production Stores(file shares)', 'Production' and copying of pre-requisite data"
+                    #Creation of 'Production Store(s)'          
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameSmall" --quota $(fileShareQuotaSmall) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameMedium" --quota $(fileShareQuotaMedium) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameLarge" --quota $(fileShareQuotaLarge) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$prodStoreSmallMOPName" --quota $(fileShareQuotaSmall) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$prodStoreMediumMOPName" --quota $(fileShareQuotaMedium) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$prodStoreLargeMOPName" --quota $(fileShareQuotaLarge) --enabled-protocols SMB --output none
+                    echo "Iteration $i: S/M/L Production Store(s)(file shares) created successfully"
+                    CreateProductionSML #CreateProductionSML() Function Invoke
+                    #Copy Sample Data to Production
+                    echo "Iteration $i: Now starting with copy of data to $(storageAccountWIP)"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceSmall) --destination-path "$productionSmall/$(subproductionVideo)" --destination-share "$productionStoreNameSmall" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceMedium) --destination-path "$productionMedium/$(subproductionVideo)" --destination-share "$productionStoreNameMedium" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceLarge) --destination-path "$productionLarge/$(subproductionVideo)" --destination-share "$productionStoreNameLarge" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceSmall) --destination-path "$productionSmallMOP/$(subproductionVideo)" --destination-share "$prodStoreSmallMOPName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceMedium) --destination-path "$productionMediumMOP/$(subproductionVideo)" --destination-share "$prodStoreMediumMOPName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceLarge) --destination-path "$productionLargeMOP/$(subproductionVideo)" --destination-share "$prodStoreLargeMOPName" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    echo "Iteration $i: Completed copying S/M/L data to respective Productions within Production Stores(file shares) under SA: $(storageAccountWIP)"
+                    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Iteration ENDS here @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                    echo ""
+                  done
+                  echo "##vso[task.setvariable variable=queryProductionStores;isOutput=true;]$varProductionStores"
+                  echo "##vso[task.setvariable variable=queryProductions;isOutput=true;]$varProductions"
+                else
+                  #LoginAndFetchAccountKey() Function Invoke
+                  LoginAndFetchAccountKey
+                  echo 'Number of Delta Production Stores(file shares) to be created: $(numberOfProductionStoresDelta)'
+                  for ((i=1;i<=$(numberOfProductionStoresDelta);i++));               
+                  do
+                    #Dynamic Variables
+                    guid=$(uuidgen)
+                    ticks=$(date +%s%3N)
+                    productionStoreNameDelta=$(productionStoreStaticWIP)-$(productionStoreDelta)-$(date +%F)-$ticks
+                    productionStoreDeltaGUID=$(uuidgen)                  
+                    productionDelta=$(productionDeltaWIP)_$guid
+                    varDeltaProductionStores+="INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreDeltaGUID', '$productionStoreNameDelta','North Europe','\\$productionStoreNameDelta',$(sqlAllocatedSize),'\\$productionStoreNameDelta',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');"
+                    varDeltaProductions+="INSERT INTO [dbo].Production VALUES ('$(uuidgen)', '$productionDelta', '$productionStoreDeltaGUID','/$productionStoreNameDelta/$productionDelta', NULL, '/$productionStoreNameDelta/$productionDelta', 'Online', GETUTCDATE(), NULL, NULL, NULL, NULL);"
+                    echo "############################################# New Iteration STARTS Here #############################################"
+                    echo $varDeltaProductionStores
+                    echo $varDeltaProductions
+                    echo ""                    
+                    echo "Iteration $i: Going ahead with creation of 'Delta Production Stores(file shares)', 'Production' and copying of pre-requisite data for iteration $i"
+                    #Creation of 'Production Store(s)'          
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameDelta" --quota $(fileShareQuotaDelta) --enabled-protocols SMB --output none
+                    echo "Iteration $i: Delta Production Store(s)(file shares) created successfully"
+                    #Create Delta Production(s) within a 'Delta Production Store'
+                    az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameDelta" --name "$productionDelta" --output none
+                    az storage directory create --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP" --share-name "$productionStoreNameDelta" --name "$productionDelta/$(subproductionVideo)" --output none
+                    #Copy Sample Data to Production
+                    echo "Iteration $i: Now starting with copy of data to $(storageAccountWIP)"
+                    az storage file copy start-batch --source-account-name '$(sampleDataSourceStorageAccountName)' --source-account-key "$sampleDataSourceStorageAccountKey" --source-container $(sampleDataSourceDelta) --destination-path "$productionDelta/$(subproductionVideo)" --destination-share "$productionStoreNameDelta" --account-name '$(storageAccountWIP)' --account-key "$storageAccountKeyWIP"
+                    echo "Iteration $i: Completed copying Delta data to respective Productions within Production Stores(file shares) under SA: $(storageAccountWIP)"
+                    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Iteration ENDS here @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                    echo ""                                        
+                  done
+                  echo "##vso[task.setvariable variable=queryDeltaProductionStores;isOutput=true;]$varDeltaProductionStores"
+                  echo "##vso[task.setvariable variable=queryDeltaProductions;isOutput=true;]$varDeltaProductions"
+                fi
+            name: dynamicdatagenerationstepWIP    
+            displayName: 'Populate WIP Storage Account with Data'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+
+  - job: job_populate_data_sqldatabase_wip
+    displayName: 'Populate WIP Data in SQL Tables'
+    dependsOn: ['job_populate_data_storageaccount_wip']
+    condition:  succeeded('job_populate_data_storageaccount_wip')
+    pool:
+      vmImage: 'windows-latest'
+    variables:
+      queryInsertProductionStores:  $[ dependencies.job_populate_data_storageaccount_wip.outputs['dynamicdatagenerationstepWIP.queryProductionStores'] ]
+      queryInsertProductions:  $[ dependencies.job_populate_data_storageaccount_wip.outputs['dynamicdatagenerationstepWIP.queryProductions'] ]
+      queryInsertDeltaProductionStores:  $[ dependencies.job_populate_data_storageaccount_wip.outputs['dynamicdatagenerationstepWIP.queryDeltaProductionStores'] ]
+      queryInsertDeltaProductions:  $[ dependencies.job_populate_data_storageaccount_wip.outputs['dynamicdatagenerationstepWIP.queryDeltaProductions'] ]
+    steps:   
+    - powershell: |
+        #Log-In to Azure using SPN and set required AzureSubscription
+        az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+        az account set --subscription $(tf-subscription-sa-id)
+        if("$(boolCreateSMLProductionStores)" -eq "true")
+        {
+          echo "$(queryInsertProductionStores)"
+          echo "$(queryInsertProductions)"
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertProductionStores)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertProductions)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+        }
+        else
+        {
+          echo "$(queryInsertDeltaProductionStores)"
+          echo "$(queryInsertDeltaProductions)"
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertDeltaProductionStores)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertDeltaProductions)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+        }        
+      displayName: 'Populate WIP Data - ProductionStore & Production Tables'
+      env:
+        ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+        ARM_CLIENT_ID: $(clientId)
+        ARM_CLIENT_SECRET: $(clientSecret)
+        ARM_TENANT_ID: $(wpp-it-cloudstudio-tenant)
+
+  - job: job_get_production_store_wip
+    displayName: 'Get WIP Production Stores(File Shares) Data from SQL'
+    condition: always()
+    dependsOn: ['job_populate_data_sqldatabase_wip']
+    pool:
+      vmImage: 'windows-latest'    
+    steps:
+          - powershell: |
+              #Global Variables
+              $csvPathWIP="$(System.DefaultWorkingDirectory)\wppstorageautomation.performancetests\src\test\resources\productiondataWIP.csv"
+              $csvPathDelta="$(System.DefaultWorkingDirectory)\wppstorageautomation.performancetests\src\test\resources\productiondataWIPDelta.csv"
+              #Log-In to Azure using SPN and set required AzureSubscription
+              az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+              az account set --subscription $(tf-subscription-sa-id)
+              if("$(boolCreateSMLProductionStores)" -eq "true")
+              {
+                #Get Large, Medium and Small Production Stores & GUIDs                
+                echo "$(queryLargeProductionArchivePS)$(queryMediumProductionArchivePS)$(querySmallProductionArchivePS)$(queryLargeProductionMOP)$(queryMediumProductionMOP)$(querySmallProductionMOP)"                
+                $dataTable=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryLargeProductionArchivePS)$(queryMediumProductionArchivePS)$(querySmallProductionArchivePS)$(queryLargeProductionMOP)$(queryMediumProductionMOP)$(querySmallProductionMOP)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                if (-not [string]::IsNullOrEmpty($dataTable))
+                {
+                  For($i=0;$i -lt $(numberOfProductionStoresWIP);$i++)
+                  {
+                    $csvContent=[PSCustomObject]@{ArchivePSLargeProductionId = "$($dataTable[0].Rows[$i] | %{ echo $_.Id })";ArchivePSLargeProductionStoreId = "$($dataTable[0].Rows[$i] | %{ echo $_.ProductionStoreId })";ArchivePSMediumProductionId = "$($dataTable[1].Rows[$i] | %{ echo $_.Id })";ArchivePSMediumProductionStoreId = "$($dataTable[1].Rows[$i] | %{ echo $_.ProductionStoreId })";ArchivePSSmallProductionId = "$($dataTable[2].Rows[$i] | %{ echo $_.Id })";ArchivePSSmallProductionStoreId = "$($dataTable[2].Rows[$i] | %{ echo $_.ProductionStoreId })";MOPLargeProductionId = "$($dataTable[3].Rows[$i] | %{ echo $_.Id })";MOPLargeProductionStoreId = "$($dataTable[3].Rows[$i] | %{ echo $_.ProductionStoreId })";MOPMediumProductionId = "$($dataTable[4].Rows[$i] | %{ echo $_.Id })";MOPMediumProductionStoreId = "$($dataTable[4].Rows[$i] | %{ echo $_.ProductionStoreId })";MOPSmallProductionId = "$($dataTable[5].Rows[$i] | %{ echo $_.Id })";MOPSmallProductionStoreId = "$($dataTable[5].Rows[$i] | %{ echo $_.ProductionStoreId })";} 
+                    $csvContent | Export-Csv -Path $csvPathWIP -NoTypeInformation -Append -Force
+                  }
+                  Get-Content -Path $csvPathWIP
+                }
+                else
+                {
+                  echo "No matching records found in SQL, hence CSV($csvPathWIP) will not be populated"
+                }
+              }
+              else
+              {
+                #Get Delta Production Stores & GUIDs
+                echo "$(queryDeltaProductionArchivePS)"
+                $dataTable=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryDeltaProductionArchivePS)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                if (-not [string]::IsNullOrEmpty($dataTable))
+                {                
+                  For($i=0;$i -lt $(numberOfProductionStoresDelta);$i++)
+                  {
+                  $csvContent=[PSCustomObject]@{ArchivePSDeltaProductionId = "$($dataTable[0].Rows[$i] | %{ echo $_.Id })";ArchivePSDeltaProductionStoreId = "$($dataTable[0].Rows[$i] | %{ echo $_.ProductionStoreId })";} 
+                  $csvContent | Export-Csv -Path $csvPathDelta -NoTypeInformation -Append -Force
+                  }
+                  Get-Content -Path $csvPathDelta
+                }
+                else
+                {
+                  echo "No matching records found in SQL, hence CSV($csvPathDelta) will not be populated"
+                }
+              }
+            name: getproductionstorestepWIP    
+            displayName: 'Get WIP Production Stores(file shares)'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+          
+          - task: CopyFiles@2
+            displayName: 'Copy WIP Resource Files'
+            inputs:
+              SourceFolder: ''
+              Contents: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/src/test/resources/**'
+              TargetFolder: '$(System.DefaultWorkingDirectory)/resourcesTempFolderWIP/'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish WIP Resource Files as Artifacts'
+            inputs:
+              PathtoPublish: '$(System.DefaultWorkingDirectory)/resourcesTempFolderWIP/'
+              ArtifactName: 'WIPArtifacts'
+              publishLocation: 'Container'
+
+  - job: job_delete_data_storageaccount_arc
+    displayName: 'Delete Containers from ARC Storage Account'
+    condition:  or(eq('${{ parameters.deleteAndPopulateDataARC }}', 'true'),eq('${{ parameters.deleteDataARC }}', 'true'))
+    pool:
+      vmImage: 'ubuntu-latest'    
+    steps:
+          - bash: |
+                set -eu #Error Resilience
+                #Log-In to Azure using SPN and set required AzureSubscription
+                az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+                az account set --subscription $(tf-subscription-sa-id)
+                #Fetch storageAccountKeyARC
+                export storageAccountKeyARC="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountARC) --query '[0].value' -o tsv)"
+                #Delete all 'Production Stores' under 'storageAccountARC'
+                if [[ $(az storage container list --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --query "[].name") != "[]" ]]; then 
+                  echo "Starting with 'Purge' of all Production Stores(containers) in $(storageAccountARC)"
+                  az storage container list --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --query "[].name" --output tsv | xargs -L1 bash -ec 'az storage container delete --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --name $0 --output none'
+                  echo "Completed purging all Production Stores(containers) in $(storageAccountARC)"
+                else
+                  echo 'No containers found for purging'
+                fi
+            name: deleteproductionstoresstepARC    
+            displayName: 'Purge ARC Production Stores(Containers) in Storage Account'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+
+  - job: job_populate_data_storageaccount_arc
+    displayName: 'Populate ARC Storage Account(Containers)'
+    condition:  or(eq('${{ parameters.deleteAndPopulateDataARC }}', 'true'),eq('${{ parameters.populateDataARC }}', 'true'))
+    dependsOn: ['job_delete_data_storageaccount_arc']
+    pool:
+      vmImage: 'ubuntu-latest'    
+    steps:
+          - bash: |
+                set -eu #Error Resilience
+                #Global Variables
+                varARCProductionStores=""
+                varARCProductions=""
+                queryARCProductionStores=""
+                queryARCProductions=""
+                varDeltaProductionStores=""
+                varDeltaProductions=""
+                queryDeltaProductionStores=""
+                queryDeltaProductions=""
+                metadataFile=".metadata"
+                #Function to Log-In to Azure using SPN and fetch storageAccountKeyWIP
+                function LoginAndFetchAccountKey(){
+                az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+                az account set --subscription $(tf-subscription-sa-id)
+                #Fetch storageAccountKeyARC
+                export sampleDataSourceStorageAccountKey="$(az storage account keys list -g $(sampleDataSourceResourceGroupName) -n $(sampleDataSourceStorageAccountName) --query '[0].value' -o tsv)"
+                export storageAccountKeyARC="$(az storage account keys list -g $(resourceGroupName) -n $(storageAccountARC) --query '[0].value' -o tsv)"
+                }
+                if [[ $(boolCreateSMLProductionStores) == "true" ]]; then
+                  #LoginAndFetchAccountKey() Function Invoke
+                  LoginAndFetchAccountKey
+                  echo "Number of S/M/L ARC(containers) Production Stores(in multiples of 3 - Small[1GB],Medium[5GB]&Large[25GB]) to be created: $(numberOfProductionStoresARC)"
+                  for ((i=1;i<=$(numberOfProductionStoresARC);i++));               
+                  do
+                    #Dynamic Variables
+                    ticks=$(date +%s%3N)
+                    productionStoreNameSmall=$(productionStoreStaticARC)-$(productionStoreSmall)-$(date +%F)-$ticks
+                    productionStoreSmallGUID=$(uuidgen)
+                    productionStoreNameMedium=$(productionStoreStaticARC)-$(productionStoreMedium)-$(date +%F)-$ticks
+                    productionStoreMediumGUID=$(uuidgen)
+                    productionStoreNameLarge=$(productionStoreStaticARC)-$(productionStoreLarge)-$(date +%F)-$ticks
+                    productionStoreLargeGUID=$(uuidgen)
+                    productionSmallGUID=$(uuidgen)
+                    smallBlob=$productionSmallGUID$metadataFile
+                    productionMediumGUID=$(uuidgen)
+                    mediumBlob=$productionMediumGUID$metadataFile
+                    productionLargeGUID=$(uuidgen)
+                    largeBlob=$productionLargeGUID$metadataFile
+                    varARCProductionStores+="INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreSmallGUID', '$productionStoreNameSmall','North Europe','\\$productionStoreNameSmall',$(sqlAllocatedSize),'\\$productionStoreNameSmall',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreMediumGUID', '$productionStoreNameMedium','North Europe','\\$productionStoreNameMedium',$(sqlAllocatedSize),'\\$productionStoreNameMedium',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreLargeGUID', '$productionStoreNameLarge','North Europe','\\$productionStoreNameLarge',$(sqlAllocatedSize),'\\$productionStoreNameLarge',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');"
+                    varARCProductions+="INSERT INTO [dbo].Production VALUES ('$productionSmallGUID', '$(productionSmallARC)', '$productionStoreSmallGUID','/$productionStoreNameSmall/$(productionSmallARC)', NULL, '/$productionStoreNameSmall/$(productionSmallARC)', 'Offline', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$productionMediumGUID', '$(productionMediumARC)', '$productionStoreMediumGUID','/$productionStoreNameMedium/$(productionMediumARC)', NULL, '/$productionStoreNameMedium/$(productionMediumARC)', 'Offline', GETUTCDATE(), NULL, NULL, NULL, NULL);INSERT INTO [dbo].Production VALUES ('$productionLargeGUID', '$(productionLargeARC)', '$productionStoreLargeGUID','/$productionStoreNameLarge/$(productionLargeARC)', NULL, '/$productionStoreNameLarge/$(productionLargeARC)', 'Offline', GETUTCDATE(), NULL, NULL, NULL, NULL);"
+                    echo "############################################# New Iteration STARTS Here #############################################"                    
+                    echo "Small Blob Metadata Filename: $smallBlob"
+                    echo "Medium Blob Metadata Filename: $mediumBlob"
+                    echo "Large Blob Metadata Filename: $largeBlob"
+                    echo $varARCProductionStores
+                    echo $varARCProductions
+                    echo ""                    
+                    echo "Iteration $i: Going ahead with creation of S/M/L Production Stores(containers), Production and copying of pre-requisite data"
+                    #Creation of Production Stores(Containers)
+                    az storage container create --account-name '$(storageAccountARC)' --name "$productionStoreNameSmall" --account-key "$storageAccountKeyARC" --auth-mode key
+                    az storage container create --account-name '$(storageAccountARC)' --name "$productionStoreNameMedium" --account-key "$storageAccountKeyARC" --auth-mode key
+                    az storage container create --account-name '$(storageAccountARC)' --name "$productionStoreNameLarge" --account-key "$storageAccountKeyARC" --auth-mode key
+                    echo "Iteration $i: S/M/L Production Stores(containers) created successfully"
+                    #Copy Sample Data to Production
+                    echo "Iteration $i: Now starting with copy of data to $(storageAccountARC)"
+                    az storage blob copy start-batch --account-key "$storageAccountKeyARC" --account-name '$(storageAccountARC)' --destination-container "$productionStoreNameSmall/$productionSmallGUID" --source-account-key "$sampleDataSourceStorageAccountKey" --source-account-name '$(sampleDataSourceStorageAccountName)' --source-container $(sampleDataSourceSmall)
+                    az storage blob copy start-batch --account-key "$storageAccountKeyARC" --account-name '$(storageAccountARC)' --destination-container "$productionStoreNameMedium/$productionMediumGUID" --source-account-key "$sampleDataSourceStorageAccountKey" --source-account-name '$(sampleDataSourceStorageAccountName)' --source-container $(sampleDataSourceMedium)
+                    az storage blob copy start-batch --account-key "$storageAccountKeyARC" --account-name '$(storageAccountARC)' --destination-container "$productionStoreNameLarge/$productionLargeGUID" --source-account-key "$sampleDataSourceStorageAccountKey" --source-account-name '$(sampleDataSourceStorageAccountName)' --source-container $(sampleDataSourceLarge)
+                    echo "Iteration $i: Completed copying S/M/L data to respective Productions within Production Stores(containers) under SA: $(storageAccountARC)"
+                    #Creation of JSON File
+                    jq -n --arg productionSmallGUID "$productionSmallGUID" '{"Items":{},"Id":$productionSmallGUID}' > "metadataSmall$i.json"
+                    jq -n --arg productionMediumGUID "$productionMediumGUID" '{"Items":{},"Id":$productionMediumGUID}' > "metadataMedium$i.json"
+                    jq -n --arg productionLargeGUID "$productionLargeGUID" '{"Items":{},"Id":$productionLargeGUID}' > "metadataLarge$i.json"
+                    #cat "metadataSmall$i.json"
+                    #Upload JSON File as metadata to Storage Container
+                    az storage blob upload --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --container-name "$productionStoreNameSmall/$productionSmallGUID" --file "metadataSmall$i.json" --name $smallBlob
+                    az storage blob upload --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --container-name "$productionStoreNameMedium/$productionMediumGUID" --file "metadataMedium$i.json" --name $mediumBlob
+                    az storage blob upload --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --container-name "$productionStoreNameLarge/$productionLargeGUID" --file "metadataLarge$i.json" --name $largeBlob
+                    echo "Iteration $i: Metadata(json) file created and uploaded successfully to desired S/M/L Production for Restore"
+                    #Creation of 'Production Stores(file shares)'          
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameSmall" --quota $(fileShareQuotaSmall) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameMedium" --quota $(fileShareQuotaMedium) --enabled-protocols SMB --output none
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameLarge" --quota $(fileShareQuotaLarge) --enabled-protocols SMB --output none
+                    echo "Iteration $i: Created Empty S/M/L Production Store(s)(file shares) successfully under SA: $(storageAccountWIP) for Restore"
+                    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Iteration ENDS here @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                    echo ""                                        
+                  done
+                  echo "##vso[task.setvariable variable=queryARCProductionStores;isOutput=true;]$varARCProductionStores"
+                  echo "##vso[task.setvariable variable=queryARCProductions;isOutput=true;]$varARCProductions"
+                else
+                  #LoginAndFetchAccountKey() Function Invoke
+                  LoginAndFetchAccountKey
+                  echo 'Number of Delta Production Stores(containers) to be created: $(numberOfProductionStoresDelta)'
+                  for ((i=1;i<=$(numberOfProductionStoresDelta);i++));               
+                  do
+                    #Dynamic Variables
+                    ticks=$(date +%s%3N)
+                    productionStoreNameDelta=$(productionStoreStaticARC)-$(productionStoreDelta)-$(date +%F)-$ticks
+                    productionStoreDeltaGUID=$(uuidgen)
+                    productionDeltaGUID=$(uuidgen)
+                    deltaBlob=$productionDeltaGUID$metadataFile
+                    varDeltaProductionStores+="INSERT INTO [dbo].ProductionStore VALUES ('$productionStoreDeltaGUID', '$productionStoreNameDelta','North Europe','\\$productionStoreNameDelta',$(sqlAllocatedSize),'\\$productionStoreNameDelta',$(sqlAllocatedSize),NULL,NULL,NULL,NULL,NULL,NULL,NULL,'$(sqlManagerRoleGroupNamesStatic)','$(sqlUserRoleGroupNamesStatic)','kv-sa-$(storageAccountWIP)','kv-sa-$(storageAccountARC)');"
+                    varDeltaProductions+="INSERT INTO [dbo].Production VALUES ('$productionDeltaGUID', '$(productionDeltaARC)', '$productionStoreDeltaGUID','/$productionStoreNameDelta/$(productionDeltaARC)', NULL, '/$productionStoreNameDelta/$(productionDeltaARC)', 'Offline', GETUTCDATE(), NULL, NULL, NULL, NULL);"
+                    echo "############################################# New Iteration STARTS Here #############################################"
+                    echo "Delta Blob Metadata Filename: $deltaBlob"
+                    echo $varDeltaProductionStores
+                    echo $varDeltaProductions
+                    echo ""                    
+                    echo "Iteration $i: Going ahead with creation of 'Delta Production Stores(containers)', 'Production' and copying of pre-requisite data for iteration $i"
+                    #Creation of 'Production Store(s)'          
+                    az storage container create --account-name '$(storageAccountARC)' --name "$productionStoreNameDelta" --account-key "$storageAccountKeyARC" --auth-mode key                    
+                    echo "Iteration $i: Delta Production Store(s)(containers) created successfully"
+                    #Copy Sample Data to Production
+                    echo "Iteration $i: Now starting with copy of data..."
+                    az storage blob copy start-batch --account-key "$storageAccountKeyARC" --account-name '$(storageAccountARC)' --destination-container "$productionStoreNameDelta/$(productionDeltaARC)" --source-account-key "$sampleDataSourceStorageAccountKey" --source-account-name '$(sampleDataSourceStorageAccountName)' --source-container $(sampleDataSourceDelta)
+                    echo "Iteration $i: Completed copying Delta data to respective Delta Productions within Production Stores(containers) under SA: $(storageAccountARC)"
+                    #Creation of JSON File
+                    jq -n --arg productionDeltaGUID "$productionDeltaGUID" '{"Items":{},"Id":$productionDeltaGUID}' > "metadataDelta$i.json"
+                    #cat "metadataDelta$i.json"
+                    #Upload JSON File as metadata to Storage Container
+                    az storage blob upload --account-name '$(storageAccountARC)' --account-key "$storageAccountKeyARC" --container-name "$productionStoreNameDelta/$(productionDeltaARC)" --file "metadataDelta$i.json" --name $deltaBlob
+                    echo "Iteration $i: Metadata(json) file created and uploaded successfully to desired Delta Production for Restore"                    
+                    #Creation of 'Production Stores(file shares)' 
+                    az storage share-rm create --resource-group '$(resourceGroupName)' --storage-account '$(storageAccountWIP)' --name "$productionStoreNameDelta" --quota $(fileShareQuotaDelta) --enabled-protocols SMB --output none
+                    echo "Iteration $i: Created Empty Production Store(s)(file share) successfully under SA: $(storageAccountWIP) for Restore"
+                    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Iteration ENDS here @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"   
+                    echo ""                                      
+                  done
+                  echo "##vso[task.setvariable variable=queryDeltaProductionStores;isOutput=true;]$varDeltaProductionStores"
+                  echo "##vso[task.setvariable variable=queryDeltaProductions;isOutput=true;]$varDeltaProductions"                  
+                fi
+            name: dynamicdatagenerationstepARC    
+            displayName: 'Populate ARC Storage Account with Data'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+
+  - job: job_populate_data_sqldatabase_arc
+    displayName: 'Populate ARC Data in SQL Tables'
+    dependsOn: ['job_populate_data_storageaccount_arc']
+    condition:  succeeded('job_populate_data_storageaccount_arc')
+    pool:
+      vmImage: 'windows-latest'
+    variables:
+      queryInsertARCProductionStores:  $[ dependencies.job_populate_data_storageaccount_arc.outputs['dynamicdatagenerationstepARC.queryARCProductionStores'] ]
+      queryInsertARCProductions:  $[ dependencies.job_populate_data_storageaccount_arc.outputs['dynamicdatagenerationstepARC.queryARCProductions'] ]
+      queryInsertDeltaProductionStores:  $[ dependencies.job_populate_data_storageaccount_arc.outputs['dynamicdatagenerationstepARC.queryDeltaProductionStores'] ]
+      queryInsertDeltaProductions:  $[ dependencies.job_populate_data_storageaccount_arc.outputs['dynamicdatagenerationstepARC.queryDeltaProductions'] ]
+    steps:   
+    - powershell: |
+        #Log-In to Azure using SPN and set required AzureSubscription
+        az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+        az account set --subscription $(tf-subscription-sa-id)
+        if("$(boolCreateSMLProductionStores)" -eq "true")
+        {
+          echo "$(queryInsertARCProductionStores)"
+          echo "$(queryInsertARCProductions)"
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertARCProductionStores)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertARCProductions)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose        
+        }
+        else
+        {
+          echo "$(queryInsertDeltaProductionStores)"
+          echo "$(queryInsertDeltaProductions)"
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertDeltaProductionStores)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+          Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryInsertDeltaProductions)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -Verbose
+        } 
+      displayName: 'Populate ARC Data - Production Store & Production Tables'
+      env:
+        ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+        ARM_CLIENT_ID: $(clientId)
+        ARM_CLIENT_SECRET: $(clientSecret)
+        ARM_TENANT_ID: $(wpp-it-cloudstudio-tenant)
+
+  - job: job_get_production_store_arc
+    displayName: 'Get ARC Production Stores(Containers) Data from SQL'
+    condition: always()
+    dependsOn: ['job_populate_data_sqldatabase_arc']
+    pool:
+      vmImage: 'windows-latest'    
+    steps:
+          - powershell: |
+              #Global Variables
+              $csvPathARC="$(System.DefaultWorkingDirectory)\wppstorageautomation.performancetests\src\test\resources\productiondataARC.csv"
+              $csvPathDelta="$(System.DefaultWorkingDirectory)\wppstorageautomation.performancetests\src\test\resources\productiondataARCDelta.csv"
+              #Log-In to Azure using SPN and set required AzureSubscription
+              az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+              az account set --subscription $(tf-subscription-sa-id)
+              if("$(boolCreateSMLProductionStores)" -eq "true")
+              {
+                #Get Large, Medium and Small Production Stores & GUIDs
+                #echo "SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionLargeARC)%') ORDER BY CreatedDateTime DESC;SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumARC)%') ORDER BY CreatedDateTime DESC;SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallARC)%') ORDER BY CreatedDateTime DESC;"
+                echo "$(queryLargeRestoreProduction)$(queryMediumRestoreProduction)$(querySmallRestoreProduction)"
+                #$dataTable=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionLargeARC)%') ORDER BY CreatedDateTime DESC;SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumARC)%') ORDER BY CreatedDateTime DESC;SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallARC)%') ORDER BY CreatedDateTime DESC;" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                $dataTable=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryLargeRestoreProduction)$(queryMediumRestoreProduction)$(querySmallRestoreProduction)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                if (-not [string]::IsNullOrEmpty($dataTable))
+                { 
+                  For($i=0;$i -lt $(numberOfProductionStoresARC);$i++)
+                  {
+                  $csvContent=[PSCustomObject]@{ARCLargeProductionId = "$($dataTable[0].Rows[$i] | %{ echo $_.Id })";ARCLargeProductionStoreId = "$($dataTable[0].Rows[$i] | %{ echo $_.ProductionStoreId })";ARCMediumProductionId = "$($dataTable[1].Rows[$i] | %{ echo $_.Id })";ARCMediumProductionStoreId = "$($dataTable[1].Rows[$i] | %{ echo $_.ProductionStoreId })";ARCSmallProductionId = "$($dataTable[2].Rows[$i] | %{ echo $_.Id })";ARCSmallProductionStoreId = "$($dataTable[2].Rows[$i] | %{ echo $_.ProductionStoreId })";} 
+                  $csvContent | Export-Csv -Path $csvPathARC -NoTypeInformation -Append -Force
+                  }
+                  Get-Content -Path $csvPathARC
+                }
+                else
+                {
+                  echo "No matching records found in SQL, hence CSV($csvPathARC) will not be populated"                  
+                }
+              }
+              else 
+              {
+                #Get Delta Production Stores & GUIDs                
+                echo "$(queryDeltaRestoreProduction)"                
+                $dataTable=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryDeltaRestoreProduction)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataTables
+                if (-not [string]::IsNullOrEmpty($dataTable))
+                {                 
+                  For($i=0;$i -lt $(numberOfProductionStoresDelta);$i++)
+                  {
+                  $csvContent=[PSCustomObject]@{ARCDeltaProductionId = "$($dataTable[0].Rows[$i] | %{ echo $_.Id })";ARCDeltaProductionStoreId = "$($dataTable[0].Rows[$i] | %{ echo $_.ProductionStoreId })";} 
+                  $csvContent | Export-Csv -Path $csvPathDelta -NoTypeInformation -Append -Force
+                  }
+                  Get-Content -Path $csvPathDelta
+                }
+                else
+                {
+                  echo "No matching records found in SQL, hence CSV($csvPathDelta) will not be populated"                  
+                }
+              }              
+            name: getproductionstorestepARC    
+            displayName: 'Get ARC Production Stores(containers)'
+            env:
+              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+              ARM_CLIENT_ID:       $(clientId)
+              ARM_CLIENT_SECRET:   $(clientSecret)
+              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)
+
+          - task: CopyFiles@2
+            displayName: 'Copy ARC Resource Files'
+            inputs:
+              SourceFolder: ''
+              Contents: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/src/test/resources/**'
+              TargetFolder: '$(System.DefaultWorkingDirectory)/resourcesTempFolderARC/'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish ARC Resource Files as Artifacts'
+            inputs:
+              PathtoPublish: '$(System.DefaultWorkingDirectory)/resourcesTempFolderARC/'
+              ArtifactName: 'ARCArtifacts'
+              publishLocation: 'Container'
+
+#  - job: job_get_production_guid_arc
+#    displayName: 'Get Production GUID ARC(Containers)'
+#    condition: always()
+#    dependsOn: ['job_populate_data_sqldatabase_arc']
+#    pool:
+#      vmImage: 'windows-latest'    
+#    steps:
+#          - powershell: |
+#              #Log-In to Azure using SPN and set required AzureSubscription
+#              az login --service-principal -u  $(clientId) -p $(clientSecret) --tenant $(wpp-it-cloudstudio-tenant) 
+#              az account set --subscription $(tf-subscription-sa-id)
+#              #Get Large, Medium and Small Production GUIDs
+#              $dataSet=Invoke-Sqlcmd -ServerInstance '$(sqlServerName).database.windows.net' -Database '$(sqlDBName)' -Query "$(queryLargeProductionGUID);$(queryMediumProductionGUID);$(querySmallProductionGUID)" -Username '$(sqlAdminLoginId)' -Password '$(sqlAdminLoginPassword)' -As DataSet
+#              $varProductionLargeGUID=$dataSet.Tables[0].Rows | %{ echo $_.Id } 
+#              $varProductionMediumGUID=$dataSet.Tables[1].Rows | %{ echo $_.Id }
+#              $varProductionSmallGUID=$dataSet.Tables[2].Rows | %{ echo $_.Id }
+#              Write-Host "##vso[task.setvariable variable=productionLargeGUID;isOutput=true;]$varProductionLargeGUID"
+#              Write-Host "##vso[task.setvariable variable=productionMediumGUID;isOutput=true;]$varProductionMediumGUID"
+#              Write-Host "##vso[task.setvariable variable=productionSmallGUID;isOutput=true;]$varProductionSmallGUID"
+#              Write-Host $varProductionLargeGUID
+#              Write-Host $varProductionMediumGUID
+#              Write-Host $varProductionSmallGUID
+#            name: getproductionguidstepARC    
+#            displayName: 'Get Production Stores(Containers) ARC'
+#            env:
+#              ARM_SUBSCRIPTION_ID: $(tf-subscription-sa-id)
+#              ARM_CLIENT_ID:       $(clientId)
+#              ARM_CLIENT_SECRET:   $(clientSecret)
+#              ARM_TENANT_ID:       $(wpp-it-cloudstudio-tenant)

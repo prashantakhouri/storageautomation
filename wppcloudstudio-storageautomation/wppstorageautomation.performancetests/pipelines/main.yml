@@ -1,0 +1,239 @@
+name: wppcs-performance-test-pipeline
+
+trigger:  none
+
+parameters:
+- name: environment
+  displayName: Choose 'Environment' to run Performance Test
+  type: string
+  default: perf
+  values:
+  - d
+  - t
+  - perf
+- name: deleteWIP
+  displayName: Purge existing data under 'WIP' Storage Account prior to 'Performance Test'?
+  type: boolean
+  default: false
+- name: setupDataWIP
+  displayName: Setup 'WIP' data prior to 'Performance Test' (without purging data)?
+  type: boolean
+  default: false
+- name: deleteAndSetupDataWIP
+  displayName: Purge existing data and setup data under 'WIP' Storage Account prior to 'Performance Test'?
+  type: boolean
+  default: false
+- name: noOfProductionStoresWIP
+  displayName: If yes, specify number of WIP(file shares for 'ArchivePS' & 'MakeOfflineProd') Production Stores(in multiples of 6 - 2Small[1GB],2Medium[5GB]&2Large[25GB]) to be created (<=4)
+  values: 
+  - 1
+  - 2
+  - 3
+  - 4
+  - 100
+  - 150
+  default: 1
+  type: string
+- name: deleteARC
+  displayName: Purge existing data under 'ARC' Storage Account prior to 'Performance Test'?
+  type: boolean
+  default: false
+- name: setupDataARC
+  displayName: Setup 'ARC' data prior to 'Performance Test'(without purging data)?
+  type: boolean
+  default: false
+- name: deleteAndSetupDataARC
+  displayName: Purge existing data and setup data under 'ARC' Storage Account prior to 'Performance Test'?
+  type: boolean
+  default: false
+- name: noOfProductionStoresARC
+  displayName: If yes, specify number of 'ARC(containers) Production Stores'(in multiples of 3 - Small[1GB],Medium[5GB]&Large[25GB]) to be created (<=7)
+  values: 
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  default: 1
+  type: string
+- name: runLoadTest
+  displayName: Whether run Load Test? 
+  type: boolean 
+  default: false
+- name: bearerToken
+  displayName: Bearer Token
+  type: string
+- name: loadTestDuration
+  displayName: Test Duration (in secs)
+  default: 20
+  type: string
+- name: scn01ArchiveAllProductionStores
+  displayName: User Concurrency for SCN01-ArchiveAllProductionStores
+  default: 0
+  type: string
+- name: scn02ArchiveLargeProductionStore
+  displayName: User Concurrency for SCN02-ArchiveLargeProductionStore
+  default: 1
+  type: string
+- name: scn03ArchiveMediumProductionStore
+  displayName: User Concurrency for SCN03-ArchiveMediumProductionStore
+  default: 1
+  type: string
+- name: scn04ArchiveSmallProductionStore
+  displayName: User Concurrency for SCN04-ArchiveSmallProductionStore
+  default: 1
+  type: string
+- name: scn05CreateProduction
+  displayName: User Concurrency for SCN05-CreateProduction
+  default: 1
+  type: string
+- name: scn06ListProductions
+  displayName: User Concurrency for SCN06-ListProductions
+  default: 1
+  type: string
+- name: scn07RestoreLargeProduction
+  displayName: User Concurrency for SCN07-RestoreLargeProduction
+  default: 1
+  type: string
+- name: scn08RestoreMediumProduction
+  displayName: User Concurrency for SCN08-RestoreMediumProduction
+  default: 1
+  type: string
+- name: scn09RestoreSmallProduction
+  displayName: User Concurrency for SCN09-RestoreSmallProduction
+  default: 1
+  type: string
+- name: scn10ListProductionStores
+  displayName: User Concurrency for SCN10-ListProductionStores
+  default: 1
+  type: string
+- name: scn11MakeOfflineLargeProduction
+  displayName: User Concurrency for SCN11-MakeOfflineLargeProduction
+  default: 1
+  type: string
+- name: scn12MakeOfflineMediumProduction
+  displayName: User Concurrency for SCN12-MakeOfflineMediumProduction
+  default: 1
+  type: string
+- name: scn13MakeOfflineSmallProduction
+  displayName: User Concurrency for SCN13-MakeOfflineSmallProduction
+  default: 1
+  type: string  
+- name: runPostExecutionChecks
+  displayName: Whether fetch 'Production Stores' size statistics (for asynchronous scenarios) ? 
+  type: boolean 
+  default: false
+#- name: targetRPS
+#  displayName: Expected Target RPS 
+#  default: 1
+#  type: string  
+
+variables:
+  - name: env
+    value:  ${{parameters.environment}}
+  - name: deleteDataWIP
+    value: ${{parameters.deleteWIP}}
+  - name: deleteAndPopulateDataWIP
+    value: ${{parameters.deleteAndSetupDataWIP}}
+  - name: deleteDataARC
+    value: ${{parameters.deleteARC}}
+  - name: deleteAndPopulateDataARC
+    value: ${{parameters.deleteAndSetupDataARC}}
+  - name: populateDataWIP
+    value: ${{parameters.setupDataWIP}}
+  - name: numberOfProductionStoresWIP
+    value: ${{parameters.noOfProductionStoresWIP}}
+  - name: bearerToken
+    value: ${{parameters.bearerToken}}
+  - name: loadTestDuration
+    value: ${{parameters.loadTestDuration}}
+  - name: varRunLoadTest
+    value: ${{parameters.runLoadTest}}
+  - name:  varRunPostExecutionChecks
+    value: ${{parameters.runPostExecutionChecks}}
+  - name: populateDataARC
+    value: ${{parameters.setupDataARC}}
+  - name: numberOfProductionStoresARC
+    value: ${{parameters.noOfProductionStoresARC}}
+  - name: scn01ArchiveAllProductionStores
+    value: ${{parameters.scn01ArchiveAllProductionStores}}
+  - name: scn02ArchiveLargeProductionStore
+    value: ${{parameters.scn02ArchiveLargeProductionStore}}
+  - name: scn03ArchiveMediumProductionStore
+    value: ${{parameters.scn03ArchiveMediumProductionStore}}
+  - name: scn04ArchiveSmallProductionStore
+    value: ${{parameters.scn04ArchiveSmallProductionStore}}
+  - name: scn05CreateProduction
+    value: ${{parameters.scn05CreateProduction}}
+  - name: scn06ListProductions
+    value: ${{parameters.scn06ListProductions}}
+  - name: scn07RestoreLargeProduction
+    value: ${{parameters.scn07RestoreLargeProduction}}
+  - name: scn08RestoreMediumProduction
+    value: ${{parameters.scn08RestoreMediumProduction}}
+  - name: scn09RestoreSmallProduction
+    value: ${{parameters.scn09RestoreSmallProduction}}
+  - name: scn10ListProductionStores
+    value: ${{parameters.scn10ListProductionStores}}
+  - name: scn11MakeOfflineLargeProduction
+    value: ${{parameters.scn11MakeOfflineLargeProduction}}
+  - name: scn12MakeOfflineMediumProduction
+    value: ${{parameters.scn12MakeOfflineMediumProduction}}
+  - name: scn13MakeOfflineSmallProduction
+    value: ${{parameters.scn13MakeOfflineSmallProduction}}
+#- name: targetRPS
+#    value: ${{parameters.targetRPS}}
+
+stages: 
+
+  - stage: stage_populate_data
+    displayName: Populate Pre-requisite Data for Performance Test
+    variables:
+      - template: /wppstorageautomation.performancetests/pipelines/variables/configuration.yml
+      - template: /wppstorageautomation.performancetests/pipelines/variables/${{parameters.environment}}.yml
+      - group: wppstorageautomationGroup-${{parameters.environment}}
+      - group: Cloud Studio Keyvault - ${{parameters.environment}}
+    jobs:
+    - template: /wppstorageautomation.performancetests/pipelines/deploy/setup.yml
+      parameters:
+        env: ${{variables.env}}
+        storageAccountName: ${{variables.storageAccountName}}
+        resourceGroupName: ${{variables.resourceGroupName}}
+        deleteDataWIP: ${{variables.deleteDataWIP}}        
+        deleteAndPopulateDataWIP: ${{variables.deleteAndPopulateDataWIP}}
+        deleteDataARC: ${{variables.deleteDataARC}}        
+        deleteAndPopulateDataARC: ${{variables.deleteAndPopulateDataARC}}
+        populateDataWIP: ${{variables.populateDataWIP}}
+        numberOfProductionStoresWIP: ${{variables.numberOfProductionStoresWIP}}
+        populateDataARC: ${{variables.populateDataARC}}
+        numberOfProductionStoresARC: ${{variables.numberOfProductionStoresARC}}
+
+  - stage: stage_load_test
+    displayName: 'Run Load Test'
+    variables:
+      - template: /wppstorageautomation.performancetests/pipelines/variables/configuration.yml
+      - template: /wppstorageautomation.performancetests/pipelines/variables/${{parameters.environment}}.yml
+      - group: wppstorageautomationGroup-${{parameters.environment}}
+      - group: Cloud Studio Keyvault - ${{parameters.environment}}
+    jobs:
+      - template: /wppstorageautomation.performancetests/pipelines/deploy/loadtest.yml
+        parameters:
+          env: ${{variables.env}}
+    dependsOn: stage_populate_data
+    condition: and(succeeded('stage_populate_data'), eq(variables.varRunLoadTest, true))
+
+  - stage: stage_post_execution
+    displayName: 'Fetch Production Store Size Statistics post execution'
+    variables:
+      - template: /wppstorageautomation.performancetests/pipelines/variables/configuration.yml
+      - template: /wppstorageautomation.performancetests/pipelines/variables/${{parameters.environment}}.yml
+      - group: wppstorageautomationGroup-${{parameters.environment}}
+      - group: Cloud Studio Keyvault - ${{parameters.environment}}
+    jobs:
+      - template: /wppstorageautomation.performancetests/pipelines/deploy/postexecution.yml
+        parameters:
+          env: ${{variables.env}}
+    dependsOn: stage_load_test
+    condition: eq(variables.varRunPostExecutionChecks, true)

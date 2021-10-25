@@ -1,0 +1,48 @@
+openapi: 3.0.1
+info:
+  title: productionstoreapi
+  description: Import from $(funcAppNameProductionStore) Function App
+  version: '1.0'
+servers:
+  - url: https://$(apiManagementName).azure-api.net/productionstore
+paths:
+  /production-stores:
+    get:
+      summary: ListProductionStore
+      operationId: get-listproductionstore
+      responses:
+        '200':
+          description: 
+  '/getfunctionstatus/{instanceid}':
+    get:
+      summary: GetFunctionStatus
+      operationId: get-getfunctionstatus
+      parameters:
+        - name: instanceid
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  /production-stores/:
+    post:
+      summary: RegisterProductionStore
+      operationId: post-registerproductionstore
+      responses:
+        '200':
+          description: 
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]

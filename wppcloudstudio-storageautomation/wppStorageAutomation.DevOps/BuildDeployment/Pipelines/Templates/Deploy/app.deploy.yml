@@ -1,0 +1,453 @@
+ jobs:
+  - deployment: Base
+    pool:
+     vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo '##vso[task.setvariable variable=env]${{parameters.env}}
+            displayName: 'Initialize & Set Environment Variable'
+
+          - powershell: |
+              $date=$(Get-Date -Format g);
+              Write-Host "##vso[task.setvariable variable=creationDate]$date"
+            displayName: 'Set Date Tag'         
+
+
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download Build Artifacts'
+            inputs:
+              artifactName: $(appArtifactsFolder)
+              downloadPath: '$(agent.builddirectory)'
+              buildType: 'current'
+              downloadType: 'single'
+
+
+  - deployment: AppRegistrationIntegrations
+    dependsOn:
+    - Base 
+    condition: succeeded('Base')
+    pool:
+      vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                #az login --service-principal -u  $(wpp-app-subscription-clientid) -p=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id) 
+                az account set --subscription $(wpp-app-subscription-id) 
+                az webapp auth update  -g $(resourceGroupDevOps) -n $(funcAppNameProductionStore) --enabled true --action LoginWithAzureActiveDirectory --aad-client-id $(func-wppcs-productionstore-appreg-id)
+                az webapp auth update  -g $(resourceGroupDevOps) -n $(funcAppNameDataMovement) --enabled true --action LoginWithAzureActiveDirectory --aad-client-id $(func-wppcs-datamovement-appreg-id)
+                az webapp auth update  -g $(resourceGroupDevOps) -n $(funcAppNameArchiveScheduler) --enabled true --action LoginWithAzureActiveDirectory --aad-client-id $(func-wppcs-arcscheduler-appreg-id)
+                az webapp auth update  -g $(resourceGroupDevOps) -n $(funcAppNameProductionControl) --enabled true --action LoginWithAzureActiveDirectory --aad-client-id $(func-wppcs-prodcontroller-appreg-id)
+                az webapp auth update  -g $(resourceGroupDevOps) -n $(funcAppNameArcQueueStorage) --enabled true --action LoginWithAzureActiveDirectory --aad-client-id $(func-wppcs-arcqueuestorage-appreg-id)
+            displayName: "Integrate AppReg For Functioin Apps"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+  - deployment: Database
+    dependsOn:
+    - Base
+    condition: succeeded('Base')
+    pool:
+     vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: |
+                echo '##vso[task.setvariable variable=env]${{parameters.env}}'
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                #az login --service-principal -u  $(wpp-app-subscription-clientid) -p=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id) 
+                az account set --subscription $(wpp-app-subscription-id)  
+                $agentIp = (New-Object net.webclient).downloadstring("http://checkip.dyndns.com") -replace "[^\d\.]"
+                az sql server firewall-rule create -g $(resourceGroupDevOps) -s $(sqlServerName) -n DevOpsAgentId --start-ip-address $agentIp --end-ip-address $agentIp
+            displayName: 'Grant Agent DBAccess'
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - task: SqlDacpacDeploymentOnMachineGroup@0
+            displayName: 'Deploy using dacpac'
+            inputs:
+              ServerName: '$(sqlServerName).database.windows.net'
+              DacpacFile: '$(agent.builddirectory)/$(appArtifactsFolder)/Databases/Database/Wpp.StorageAutomation.WppDatabase.dacpac' 
+              DatabaseName: '$(sqlDbName)'
+              AuthScheme: sqlServerAuthentication
+              SqlUsername: '$(sqlAdminLoginId)'
+              SqlPassword: '$(sqlAdminLoginPassword)'
+
+
+          - powershell: |
+                echo '##vso[task.setvariable variable=env]${{parameters.env}}'
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                #az login --service-principal -u  $(wpp-app-subscription-clientid) -p=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id) 
+                az account set --subscription $(wpp-app-subscription-id)  
+                az sql server firewall-rule delete -n DevOpsAgentId -g $(resourceGroupDevOps) -s $(sqlServerName)
+            displayName: 'Revoke Agent DBAccess'
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+  
+  - deployment: WebApplication
+    dependsOn:
+    - Base
+    condition: succeeded('Base')
+    pool:
+      vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          # - task: Npm@1
+          #   displayName: 'WebApp npm install'
+          #   inputs:
+          #     workingDir: $(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution
+          #     verbose: true
+          
+          - task: Npm@1
+            displayName: 'WebApp npm install'
+            inputs:
+              command: custom
+              workingDir: $(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution
+              verbose: true
+              customCommand: 'install --force'
+
+          - task: Npm@1
+            displayName: 'WebApp env command install'
+            inputs:
+              command: custom
+              workingDir: $(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution
+              verbose: true
+              customCommand: 'install env-cmd'
+
+          - task: PowerShell@2
+            displayName: 'Push ${{parameters.env}} ConfigSettings' 
+            inputs: 
+              targetType: 'inline' 
+              script: |
+                    new-item -itemtype file -path $(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution -name .env.${{parameters.env}} -force -value '
+                    REACT_APP_DEPLOY_ENV=${{parameters.env}}
+                    REACT_APP_APIM_URL=https://$(apiManagementName).azure-api.net
+                    REACT_APP_AUTH_SERVER_URL=$(authserver-app-url)
+                    REACT_APP_APP_AUTH_CLIENTID=$(authserver-app-clientid)'
+      
+          - task: Npm@1
+            displayName: 'WebApp npm build ${{parameters.env}}'
+            inputs:
+              command: custom
+              workingDir: $(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution
+              verbose: true
+              customCommand: 'run build-${{parameters.env}}' 
+          
+          - task: CopyFiles@2
+            displayName: Add Web route Config to  ${{parameters.env}}
+            inputs:
+                SourceFolder: $(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution
+                Contents: 'web.config'
+                TargetFolder: '$(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution/build'
+
+          - task: ArchiveFiles@2
+            displayName: 'Archive Web App  ${{parameters.env}}'
+            inputs:
+              rootFolderOrFile: '$(agent.builddirectory)/$(appArtifactsFolder)/WebApps/Solution/build'
+              archiveType: 'zip'
+              archiveFile: '$(agent.builddirectory)/$(appArtifactsFolder)/WebApps/WebApp_${{parameters.env}}_$(sequence).zip'
+              includeRootFolder: false
+
+          - bash: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)                
+                az webapp deployment source config-zip --resource-group "$(resourceGroupDevOps)" --name "$(webAppName)" --src "$(agent.builddirectory)/$(appArtifactsFolder)/WebApps/WebApp_${{parameters.env}}_$(sequence).zip"           
+            displayName: "Web App Deploy ${{parameters.env}}"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+  
+  - deployment: FunctionApps
+    dependsOn:
+    - Base
+    condition: succeeded('Base')
+    pool:
+     vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: |
+              $date=$(Get-Date -Format g);
+              Write-Host "##vso[task.setvariable variable=creationDate]$date"
+            displayName: 'Set Date Tag'
+          - bash: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)                
+                az functionapp deployment source config-zip --resource-group "$(resourceGroupDevOps)" --name "$(funcAppNameProductionStore)" --src "$(agent.builddirectory)/$(appArtifactsFolder)/FunctionApps/ProductionStore.zip"           
+            displayName: "FunctionAppDeploy : ProductionStore"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - bash: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)                
+                az functionapp deployment source config-zip --resource-group "$(resourceGroupDevOps)" --name "$(funcAppNameDataMovement)" --src "$(agent.builddirectory)/$(appArtifactsFolder)/FunctionApps/DataMovement.zip"           
+            displayName: "FunctionAppDeploy : DataMovement"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - bash: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)                
+                az functionapp deployment source config-zip --resource-group "$(resourceGroupDevOps)" --name "$(funcAppNameProductionControl)" --src "$(agent.builddirectory)/$(appArtifactsFolder)/FunctionApps/Production.zip"           
+            displayName: "FunctionAppDeploy : Production"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - bash: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)                
+                az functionapp deployment source config-zip --resource-group "$(resourceGroupDevOps)" --name "$(funcAppNameArchiveScheduler)" --src "$(agent.builddirectory)/$(appArtifactsFolder)/FunctionApps/ArchiveScheduler.zip"           
+            displayName: "FunctionAppDeploy : ArchiveScheduler"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - bash: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)                
+                az functionapp deployment source config-zip --resource-group "$(resourceGroupDevOps)" --name "$(funcAppNameArcQueueStorage)" --src "$(agent.builddirectory)/$(appArtifactsFolder)/FunctionApps/ArchiveQueueStorage.zip"           
+            displayName: "FunctionAppDeploy : ArchiveQueueStorage"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+   
+  - deployment: KeyVaultAppIntegrations
+    dependsOn:
+    - Base 
+    condition: succeeded('Base')
+    pool:
+      vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: | 
+                az config set extension.use_dynamic_install=yes_without_prompt 
+                az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                az account set --subscription $(wpp-app-subscription-id)  
+                $sqldbSecretVaultUrl =  az keyvault secret show --name "$(keyVaultSqlDbConnectionKeyName)" --vault-name "$(keyVaultName)" --query id
+                $storageKeyVaultUri =  az keyvault secret show --name "$(keyVaultStorageUri)" --vault-name "$(keyVaultName)" --query id
+                $ApiBaseUrl =  az keyvault secret show --name "$(keyVaultFuncAppDataMovementUri)" --vault-name "$(keyVaultName)" --query id
+                $ApiAppRegId = az keyvault secret show --name "$(keyVaultFuncAppDataMovementAppRegId)" --vault-name "$(keyVaultName)" --query id
+                $ApimBaseUrl = az keyvault secret show --name "$(keyVaultAPIMBaseURL)" --vault-name "$(keyVaultName)" --query id
+                $SchedulerTimerValue = "0 */20 * * * *"
+                $DurableFunctionTimeoutValue = "15"
+                $AuthServerUrl = az keyvault secret show --name "$(keyVaultAuthserverAppOuthUrl)" --vault-name "$(keyVaultName)" --query id
+                $AuthServerAppClientId = az keyvault secret show --name "$(keyVaultAuthserverAppClientId)" --vault-name "$(keyVaultName)" --query id
+                $sddlCreateProduction = az keyvault secret show --name "$(keyVaultSddlCreateProduction)" --vault-name "$(keyVaultName)" --query id
+                $sddlReadonlyMakeOffline = az keyvault secret show --name "$(keyVaultSddlReadonlyMakeOffline)" --vault-name "$(keyVaultName)" --query id
+                $sddlFullControlConfig = az keyvault secret show --name "$(keyVaultSddlFullControlConfig)" --vault-name "$(keyVaultName)" --query id
+                $GraphApiID = az keyvault secret show --name "$(keyVaultGraphApiID)" --vault-name "$(keyVaultName)" --query id
+                $GraphApiSecret = az keyvault secret show --name "$(keyVaultGraphApiSecret)" --vault-name "$(keyVaultName)" --query id
+                $GraphApiDomainName = az keyvault secret show --name "$(keyVaultGraphApiDomainName)" --vault-name "$(keyVaultName)" --query id
+                $QueueStorageAccount = az keyvault secret show --name "$(keyVaultQueueSACS)" --vault-name "$(keyVaultName)" --query id
+                $QueueName = az keyvault secret show --name "$(keyVaultQueueName)" --vault-name "$(keyVaultName)" --query id
+                $StateDurationValue = "15"
+                $LeaseTimerIntervalValue = "25000"
+                $LeaseDurationValue = "30000"
+                az functionapp config appsettings set -g $(resourceGroupDevOps) -n $(funcAppNameProductionControl) --settings "GraphApiClientId=""@Microsoft.KeyVault(SecretUri=$GraphApiID)""" "GraphApiClientSecret=""@Microsoft.KeyVault(SecretUri=$GraphApiSecret)""" "GraphApiDomain=""@Microsoft.KeyVault(SecretUri=$GraphApiDomainName)""" "WPPSDDLConfig=""@Microsoft.KeyVault(SecretUri=$sddlCreateProduction)"""  "IsGraphSIDS=true" "WPPSQLDBConnection=""@Microsoft.KeyVault(SecretUri=$sqldbSecretVaultUrl)""" "AuthorizationServerUrl=""@Microsoft.KeyVault(SecretUri=$AuthServerUrl)""" "AuthorizationServerClientId=""@Microsoft.KeyVault(SecretUri=$AuthServerAppClientId)""" "WPPStorageKeyVaultUri=""@Microsoft.KeyVault(SecretUri=$storageKeyVaultUri)"""
+                az functionapp config appsettings set -g $(resourceGroupDevOps) -n $(funcAppNameProductionStore) --settings "API_BASE_URL=""@Microsoft.KeyVault(SecretUri=$ApiBaseUrl)""" "API_APPREG_CLIENT_ID=""@Microsoft.KeyVault(SecretUri=$ApiAppRegId)""" "WPPSQLDBConnection=""@Microsoft.KeyVault(SecretUri=$sqldbSecretVaultUrl)""" "AuthorizationServerUrl=""@Microsoft.KeyVault(SecretUri=$AuthServerUrl)""" "AuthorizationServerClientId=""@Microsoft.KeyVault(SecretUri=$AuthServerAppClientId)""" "WPPStorageKeyVaultUri=""@Microsoft.KeyVault(SecretUri=$storageKeyVaultUri)"""
+                az functionapp config appsettings set -g $(resourceGroupDevOps) -n $(funcAppNameDataMovement) --settings DurableFunctionTimeoutInterval=$DurableFunctionTimeoutValue "APIM_BASE_URL=""@Microsoft.KeyVault(SecretUri=$ApimBaseUrl)""" "WPPFullControlSDDLConfig=""@Microsoft.KeyVault(SecretUri=$sddlFullControlConfig)""" "GraphApiClientId=""@Microsoft.KeyVault(SecretUri=$GraphApiID)""" "GraphApiClientSecret=""@Microsoft.KeyVault(SecretUri=$GraphApiSecret)""" "GraphApiDomain=""@Microsoft.KeyVault(SecretUri=$GraphApiDomainName)""" "IsGraphSIDS=true" "WPPReadonlySDDLConfig=""@Microsoft.KeyVault(SecretUri=$sddlReadonlyMakeOffline)""" "WPPSDDLConfig=""@Microsoft.KeyVault(SecretUri=$sddlCreateProduction)""" "WPPSQLDBConnection=""@Microsoft.KeyVault(SecretUri=$sqldbSecretVaultUrl)""" "AuthorizationServerUrl=""@Microsoft.KeyVault(SecretUri=$AuthServerUrl)""" "AuthorizationServerClientId=""@Microsoft.KeyVault(SecretUri=$AuthServerAppClientId)""" "WPPStorageKeyVaultUri=""@Microsoft.KeyVault(SecretUri=$storageKeyVaultUri)"""
+                az functionapp config appsettings set -g $(resourceGroupDevOps) -n $(funcAppNameArchiveScheduler) --settings StateDurationTime=$StateDurationValue SchedularTimerInterval=$SchedulerTimerValue "ArchiveQueueStorageAccount=""@Microsoft.KeyVault(SecretUri=$QueueStorageAccount)""" "ArchiveQueueName=""@Microsoft.KeyVault(SecretUri=$QueueName)""" "API_BASE_URL=""@Microsoft.KeyVault(SecretUri=$ApiBaseUrl)""" "API_APPREG_CLIENT_ID=""@Microsoft.KeyVault(SecretUri=$ApiAppRegId)""" "WPPSQLDBConnection=""@Microsoft.KeyVault(SecretUri=$sqldbSecretVaultUrl)""" "WPPStorageKeyVaultUri=""@Microsoft.KeyVault(SecretUri=$storageKeyVaultUri)"""
+                az functionapp config appsettings set -g $(resourceGroupDevOps) -n $(funcAppNameArcQueueStorage) --settings LeaseTimerInterval=$LeaseTimerIntervalValue LeaseDuration=$LeaseDurationValue StateDurationTime=$StateDurationValue "ArchiveQueueStorageAccount=""@Microsoft.KeyVault(SecretUri=$QueueStorageAccount)""" "ArchiveQueueName=""@Microsoft.KeyVault(SecretUri=$QueueName)""" "WPPSQLDBConnection=""@Microsoft.KeyVault(SecretUri=$sqldbSecretVaultUrl)""" "WPPStorageKeyVaultUri=""@Microsoft.KeyVault(SecretUri=$storageKeyVaultUri)"""
+
+            displayName: "IntegrateAppsWithKeyVault"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+  - deployment: RestartAppServices
+    dependsOn:
+    - FunctionApps 
+    condition: succeeded('FunctionApps')
+    pool:
+      vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: |
+                    az config set extension.use_dynamic_install=yes_without_prompt 
+                    az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                    az account set --subscription $(wpp-app-subscription-id)
+                    az functionapp restart --n $(funcAppNameProductionControl) -g $(resourceGroupDevOps)
+                    az functionapp restart --n $(funcAppNameProductionStore) -g $(resourceGroupDevOps)                   
+                    az functionapp restart --n $(funcAppNameDataMovement) -g $(resourceGroupDevOps)
+                    az functionapp restart --n $(funcAppNameArchiveScheduler) -g $(resourceGroupDevOps)
+                    az functionapp restart --n $(funcAppNameArcQueueStorage) -g $(resourceGroupDevOps)
+            displayName: "RestartFunctionApps"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+  - deployment: APIMEndpointUpdation
+    dependsOn:
+    - RestartAppServices 
+    condition: succeeded('RestartAppServices')
+    pool:
+      vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: |
+                    az config set extension.use_dynamic_install=yes_without_prompt 
+                    az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                    az account set --subscription $(wpp-app-subscription-id)
+                    az apim api delete --api-id "datamovementapi" -g $(resourceGroupDevOps) --service-name $(apiManagementName) --yes
+                    az apim api import --path "/datamovement" -g $(resourceGroupDevOps) --service-name $(apiManagementName) --api-id "datamovementapi" --api-type http --display-name "datamovementapi"  --protocols https --service-url "https://$(funcAppNameDataMovement).azurewebsites.net/api" --specification-format OpenApi --specification-path '$(agent.builddirectory)/$(appArtifactsFolder)/AppDataTemplate/API/datamovementapi.openapi.yaml' --subscription-required false
+                    az apim api delete --api-id "prodcontrollerapi" -g $(resourceGroupDevOps) --service-name $(apiManagementName) --yes
+                    az apim api import --path "/prodcontroller" -g $(resourceGroupDevOps) --service-name $(apiManagementName) --api-id "prodcontrollerapi" --api-type http --display-name "prodcontrollerapi"  --protocols https --service-url "https://$(funcAppNameProductionControl).azurewebsites.net/api" --specification-format OpenApi --specification-path '$(agent.builddirectory)/$(appArtifactsFolder)/AppDataTemplate/API/prodcontrollerapi.openapi.yaml'--subscription-required false
+                    az apim api delete --api-id "productionstoreapi" -g $(resourceGroupDevOps) --service-name $(apiManagementName) --yes
+                    az apim api import --path "/productionstore" -g $(resourceGroupDevOps) --service-name $(apiManagementName) --api-id "productionstoreapi" --api-type http --display-name "productionstoreapi"  --protocols https --service-url "https://$(funcAppNameProductionStore).azurewebsites.net/api" --specification-format OpenApi --specification-path '$(agent.builddirectory)/$(appArtifactsFolder)/AppDataTemplate/API/productionstoreapi.openapi.yaml' --subscription-required false
+            displayName: "APIs Updation to APIM"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - powershell: |
+                    az config set extension.use_dynamic_install=yes_without_prompt 
+                    az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                    az account set --subscription $(wpp-app-subscription-id)
+                    az apim product api add --resource-group $(resourceGroupDevOps) --service-name $(apiManagementName) --product-id Unlimited --api-id "datamovementapi"
+                    az apim product api add --resource-group $(resourceGroupDevOps) --service-name $(apiManagementName) --product-id Unlimited --api-id "prodcontrollerapi"
+                    az apim product api add --resource-group $(resourceGroupDevOps) --service-name $(apiManagementName) --product-id Unlimited --api-id "productionstoreapi"
+            displayName: "APIs Product Updation to APIM"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+            continueOnError: true
+
+  - deployment: APIMPolicyUpdations
+    dependsOn:
+    - APIMEndpointUpdation 
+    condition: succeeded('APIMEndpointUpdation')
+    pool:
+      vmImage: 'windows-latest'
+    environment: ${{parameters.env}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - powershell: |
+                    az config set extension.use_dynamic_install=yes_without_prompt 
+                    az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                    az account set --subscription $(wpp-app-subscription-id)
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-pc-auth-app-introspect-url"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-pc-auth-app-clientid"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-auth-app-introspect-url"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-auth-app-clientid"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-ps-auth-app-introspect-url"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-ps-auth-app-clientid"  --yes                    
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-pc-appreg-clientid"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-ps-appreg-clientid"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-appreg-clientid"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-as-appreg-clientid"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-apim-name"  --yes
+                    az apim nv delete --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-funcapp-name"  --yes
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-pc-auth-introspect-url" --display-name 'nv-pc-auth-app-introspect-url' --value '$(authserver-app-url)/oauth2/v1/introspect' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-pc-auth-app-clientid" --display-name 'nv-pc-auth-app-clientid' --value '$(authserver-app-clientid)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-auth-introspect-url" --display-name 'nv-dm-auth-app-introspect-url' --value '$(authserver-app-url)/oauth2/v1/introspect' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-auth-app-clientid" --display-name 'nv-dm-auth-app-clientid' --value '$(authserver-app-clientid)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-ps-auth-introspect-url" --display-name 'nv-ps-auth-app-introspect-url' --value '$(authserver-app-url)/oauth2/v1/introspect' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-ps-auth-app-clientid" --display-name 'nv-ps-auth-app-clientid' --value '$(authserver-app-clientid)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-pc-appreg-clientid" --display-name 'nv-pc-appreg-clientid' --value '$(func-wppcs-prodcontroller-appreg-id)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-ps-appreg-clientid" --display-name 'nv-ps-appreg-clientid' --value '$(func-wppcs-productionstore-appreg-id)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-appreg-clientid" --display-name 'nv-dm-appreg-clientid' --value '$(func-wppcs-datamovement-appreg-id)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-as-appreg-clientid" --display-name 'nv-as-appreg-clientid' --value '$(func-wppcs-arcscheduler-appreg-id)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-apim-name"  --display-name 'nv-apim-name' --value '$(apiManagementName)' --secret true
+                    az apim nv create --service-name $(apiManagementName) -g $(resourceGroupDevOps) --named-value-id "nv-dm-funcapp-name"  --display-name 'nv-dm-funcapp-name' --value '$(funcAppNameDataMovement)' --secret true
+            displayName: "NamedValue updation to APIM"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+          - powershell: |
+                    az config set extension.use_dynamic_install=yes_without_prompt 
+                    az login --service-principal --username $(wpp-app-subscription-clientid) --password=$(wpp-app-subscription-clientsecret) --tenant $(wpp-app-subscription-tenant-id)
+                    az account set --subscription $(wpp-app-subscription-id)
+                    $tenantId = "$(wpp-app-subscription-tenant-id)"
+                    $subscription = "$(wpp-app-subscription-id)"
+                    $ApplicationId = "$(wpp-app-subscription-clientid)"
+                    $Secret = "$(wpp-app-subscription-clientsecret)"
+                    $Secret = $Secret | ConvertTo-SecureString -AsPlainText -Force
+                    $pscredential = New-Object -TypeName System.Management.Automation.PSCredential($ApplicationId, $Secret)
+                    Login-AzureRmAccount -ServicePrincipal -Credential $pscredential -Tenant $tenantId -SubscriptionId $subscription
+                    $apimContext = New-AzureRmApiManagementContext -ResourceGroupName $(resourceGroupDevOps) -ServiceName $(apiManagementName)
+                    Set-AzureRmApiManagementPolicy -Context $apimContext -ApiId "datamovementapi" -PolicyFilePath "$(agent.builddirectory)/$(appArtifactsFolder)/AppDataTemplate/API/datamovement.xml"
+                    $apimContext = new-AzureRmApiManagementContext -ResourceGroupName $(resourceGroupDevOps) -ServiceName $(apiManagementName)
+                    Set-AzureRmApiManagementPolicy -Context $apimContext -ApiId "prodcontrollerapi" -PolicyFilePath "$(agent.builddirectory)/$(appArtifactsFolder)/AppDataTemplate/API/prodcontroller.xml"
+                    $apimContext = new-AzureRmApiManagementContext -ResourceGroupName $(resourceGroupDevOps) -ServiceName $(apiManagementName)
+                    Set-AzureRmApiManagementPolicy -Context $apimContext -ApiId "productionstoreapi" -PolicyFilePath "$(agent.builddirectory)/$(appArtifactsFolder)/AppDataTemplate/API/productionstore.xml"
+            displayName: "APIs Policy Updation to APIM"
+            env:
+              ARM_SUBSCRIPTION_ID: $(wpp-app-subscription-id)
+              ARM_CLIENT_ID: $(wpp-app-subscription-clientid)
+              ARM_CLIENT_SECRET: $(wpp-app-subscription-clientsecret)
+              ARM_TENANT_ID: $(wpp-app-subscription-tenant-id)
+
+
+

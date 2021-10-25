@@ -1,0 +1,70 @@
+jobs:
+    - job: job_load_test
+#      variables: 
+#        productionStoreLarge:  $[ stageDependencies.stage_populate_data.job_get_production_store_wip.outputs['getproductionstorestepWIP.productionStoreLarge'] ]
+#        productionStoreMedium:  $[ stageDependencies.stage_populate_data.job_get_production_store_wip.outputs['getproductionstorestepWIP.productionStoreMedium'] ]
+#        productionStoreSmall:  $[ stageDependencies.stage_populate_data.job_get_production_store_wip.outputs['getproductionstorestepWIP.productionStoreSmall'] ]
+#        productionStoreLargeContainer:  $[ stageDependencies.stage_populate_data.job_get_production_store_arc.outputs['getproductionstorestepARC.productionStoreLargeContainer'] ]
+#        productionStoreMediumContainer:  $[ stageDependencies.stage_populate_data.job_get_production_store_arc.outputs['getproductionstorestepARC.productionStoreMediumContainer'] ]
+#        productionStoreSmallContainer:  $[ stageDependencies.stage_populate_data.job_get_production_store_arc.outputs['getproductionstorestepARC.productionStoreSmallContainer'] ]        
+#        productionLargeGUID:  $[ stageDependencies.stage_populate_data.job_get_production_guid_arc.outputs['getproductionguidstepARC.productionLargeGUID'] ]
+#        productionMediumGUID:  $[ stageDependencies.stage_populate_data.job_get_production_guid_arc.outputs['getproductionguidstepARC.productionMediumGUID'] ]
+#        productionSmallGUID:  $[ stageDependencies.stage_populate_data.job_get_production_guid_arc.outputs['getproductionguidstepARC.productionSmallGUID'] ]
+      pool: 
+        vmImage: 'ubuntu-latest'
+      displayName: 'Run Load Test'
+      steps:
+              
+      - task: ShellScript@2
+        displayName: 'Configure Properties for Perfomance Test'
+        env: 
+          CLIENTID: $(wpp-it-cloudstudio-app-d-001-id)
+          CLIENTSECRET: $(wpp-it-cloudstudio-app-d-001-sec)
+          TENANTID: $(wpp-it-cloudstudio-tenant)
+        inputs:
+          scriptPath: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/config_update.bash'
+
+      - task: DownloadPipelineArtifact@2
+        displayName: 'Download WIP CSV Files'
+        inputs:
+          source: 'current'
+          artifact: 'WIPArtifacts'
+          targetPath: '$(System.DefaultWorkingDirectory)/'
+          patterns: '**/*WIP*.csv'
+
+      - task: DownloadPipelineArtifact@2
+        displayName: 'Download ARC CSV Files'
+        inputs:
+          source: 'current'
+          artifact: 'ARCArtifacts'
+          targetPath: '$(System.DefaultWorkingDirectory)/'
+          patterns: '**/*ARC*.csv'
+
+      #- task: PublishBuildArtifacts@1
+      #  displayName: 'Publish WIP & ARC CSV Files as Artifacts'
+      #  inputs:
+      #    PathtoPublish: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/src/test/resources/'
+      #    ArtifactName: 'WIPArtifacts'
+      #    publishLocation: 'Container'
+
+      - script: sbt clean compile
+        displayName: 'Clean and Compile'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/'
+
+      - script: sbt gatling:test
+        displayName: 'Running Performance Tests'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/'
+
+      - task: CopyFiles@2
+        displayName: 'Copy Results'
+        inputs:
+          SourceFolder: ''
+          Contents: '/home/vsts/work/**/s/wppstorageautomation.performancetests/target/gatling/**'
+          TargetFolder: './wppstorageautomation.performancetests/reportTempFolder/'
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Build Artifacts'
+        inputs:
+          PathtoPublish: './wppstorageautomation.performancetests/reportTempFolder/'
+          ArtifactName: 'report'
+          publishLocation: 'Container'

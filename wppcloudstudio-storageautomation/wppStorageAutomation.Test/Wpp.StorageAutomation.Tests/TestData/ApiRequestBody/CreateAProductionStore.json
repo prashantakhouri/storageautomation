@@ -1,0 +1,12 @@
+{
+  "Name": "testcreateproductionstore",
+  "Region": "Asia",
+  "WIPURL": "/testcreateproductionstore",
+  "ArchiveURL": "/testcreateproductionstore",
+  "ManagerRoleGroupNames": "GRP-DEVH-AUTHz-WPP-CloudStudio-testproductionstorea-Managers",
+  "UserRoleGroupNames": "GRP-DEVH-AUTHz-WPP-CloudStudio-testproductionstorea-Users",
+  "ArchiveAllocatedSize": 10,
+  "WIPAllocatedSize": 10,
+  "WIPKeyName": "kv-sa-sawppcsneutp1",
+  "ArchiveKeyName": "kv-sa-sawppcsneutb1"
+}

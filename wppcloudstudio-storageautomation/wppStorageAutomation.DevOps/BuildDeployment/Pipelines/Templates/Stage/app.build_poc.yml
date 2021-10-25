@@ -1,0 +1,4 @@
+jobs:
+ - template: ../Deploy/app.build_poc.yml
+   parameters:
+      app: 'true'   

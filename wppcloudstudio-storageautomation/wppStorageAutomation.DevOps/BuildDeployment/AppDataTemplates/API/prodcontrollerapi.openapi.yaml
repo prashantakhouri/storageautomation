@@ -1,0 +1,65 @@
+openapi: 3.0.1
+info:
+  title: prodcontrollerapi
+  description: Import from $(funcAppNameProductionControl) Function App
+  version: '1.0'
+servers:
+  - url: https://$(apiManagementName).azure-api.net/prodcontroller
+paths:
+  '/production-stores/{productionStoreId}/productions/{productionId}':
+    delete:
+      summary: DeleteProduction
+      operationId: delete-deleteproduction
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+        - name: productionId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  '/production-stores/{productionStoreId}/productions/':
+    post:
+      summary: CreateProduction
+      operationId: post-createproduction
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+  '/production-stores/{productionStoreId}/productions':
+    get:
+      summary: GetProduction
+      operationId: get-getproduction
+      parameters:
+        - name: productionStoreId
+          in: path
+          required: true
+          schema:
+            type: ''
+      responses:
+        '200':
+          description: 
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]

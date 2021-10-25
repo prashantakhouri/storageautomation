@@ -1,0 +1,148 @@
+# Contains common variables used in azure-pipelines.yml
+variables:
+- name: resourceTypeSA
+  value: 'sa'
+- name: resourceTypeSQL
+  value: 'sql'
+- name: resourceGroupPrefix
+  value: 'rg'
+- name: project
+  value: 'wppcs'
+- name: regionShortNameWEU
+  value: 'weu'
+- name: regionShortNameNEU
+  value: 'neu'
+- name: storageAccountTypeFSPremium
+  value: 'p'
+- name: storageAccountTypeFSStandard
+  value: 's'
+- name: storageAccountTypeBlob
+  value: 'b'
+- name: storageAccountNamePerf
+  value: 'pf'
+- name: storageAccountNameTest
+  value: 't'
+- name: sequence
+  value: '01'
+- name: sequenceSA
+  value: '1'
+- name: resourceGroupStaticName
+  value: 'data'
+- name: productionStoreStaticWIP
+  value: 'perf-archive-ps'
+- name: productionStoreStaticMOP
+  value: 'perf-makeoffline-ps'
+- name: productionStoreStaticARC
+  value: 'perf-restore-ps'
+- name: productionStoreHybrid
+  value: 'hybrid-31gb'
+- name: productionStoreSmall
+  value: 'small-1gb'
+- name: productionStoreMedium
+  value: 'medium-5gb'
+- name: productionStoreLarge
+  value: 'large-25gb'
+- name: productionStoreDelta
+  value: 'delta-2560mb'
+- name: productionSmallWIP
+  value: "ArchivePS_$(productionStoreSmall)"
+- name: productionMediumWIP
+  value: "ArchivePS_$(productionStoreMedium)"
+- name: productionLargeWIP
+  value: "ArchivePS_$(productionStoreLarge)"
+- name: productionDeltaWIP
+  value: "ArchivePS_$(productionStoreDelta)"
+- name: productionSmallHybridWIP
+  value: "Production_$(productionStoreSmall)"
+- name: productionMediumHybridWIP
+  value: "Production_$(productionStoreMedium)"
+- name: productionLargeHybridWIP
+  value: "Production_$(productionStoreLarge)"
+- name: productionSmallMakeOffline
+  value: "MakeOfflineProd_$(productionStoreSmall)"
+- name: productionMediumMakeOffline
+  value: "MakeOfflineProd_$(productionStoreMedium)"
+- name: productionLargeMakeOffline
+  value: "MakeOfflineProd_$(productionStoreLarge)"
+- name: productionSmallARC
+  value: "RestoreProduction_$(productionStoreSmall)"
+- name: productionMediumARC
+  value: "RestoreProduction_$(productionStoreMedium)"
+- name: productionLargeARC
+  value: "RestoreProduction_$(productionStoreLarge)"
+- name: productionDeltaARC
+  value: "RestoreProduction_$(productionStoreDelta)"
+- name: numberOfProductionStoresDelta
+  value: 64
+- name: subproductionPrint
+  value: "Print_Production"
+- name: subproductionVideo
+  value: "Video_Production"
+- name: fileShareQuotaSmall
+  value: 1536
+- name: fileShareQuotaMedium
+  value: 1536
+- name: fileShareQuotaLarge
+  value: 1536
+- name: fileShareQuotaDelta
+  value: 1536
+- name: fileShareQuotaHybrid
+  value: 5120
+- name: sampleDataSourceLarge
+  value: "sampledata-large-25gb"
+- name: sampleDataSourceMedium
+  value: "sampledata-medium-5gb"
+- name: sampleDataSourceSmall
+  value: "sampledata-small-1gb"
+- name: sampleDataSourceDelta
+  value: "sampledata-delta-2560mb"
+- name: sqlDBName
+  value: 'wppsqldb'
+- name: sqlAllocatedSize
+  value: 5.0000000000
+- name: sqlManagerRoleGroupNamesStatic
+  value: 'GRP-DEVH-AUTHz-WPP-CloudStudio-perfproductionstorea-Managers'
+- name: sqlUserRoleGroupNamesStatic
+  value: 'GRP-DEVH-AUTHz-WPP-CloudStudio-perfproductionstorea-Users' 
+- name: applicationconffilepath
+  value: '$(System.DefaultWorkingDirectory)/wppstorageautomation.performancetests/src/test/resources/application.conf'
+- name: hostnameStaticPrefix
+  value: 'https://apim'
+- name: hostnameStaticSuffix
+  value: 'apigateway-01.azure-api.net'
+- name: queryLargeProductionArchivePS
+  value: "SELECT TOP $(numberOfProductionStoresWIP) Id,ProductionStoreId FROM [dbo].[Production] WHERE NAME LIKE ('%$(productionLargeWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: queryMediumProductionArchivePS
+  value: "SELECT TOP $(numberOfProductionStoresWIP) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: querySmallProductionArchivePS
+  value: "SELECT TOP $(numberOfProductionStoresWIP) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: queryLargeProductionMOP
+  value: "SELECT TOP $(numberOfProductionStoresWIP) Id,ProductionStoreId FROM [dbo].[Production] WHERE NAME LIKE ('%$(productionLargeMakeOffline)%') ORDER BY CreatedDateTime DESC;"
+- name: queryMediumProductionMOP
+  value: "SELECT TOP $(numberOfProductionStoresWIP) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumMakeOffline)%') ORDER BY CreatedDateTime DESC;"
+- name: querySmallProductionMOP
+  value: "SELECT TOP $(numberOfProductionStoresWIP) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallMakeOffline)%') ORDER BY CreatedDateTime DESC;"
+- name: queryDeltaProductionArchivePS
+  value: "SELECT TOP $(numberOfProductionStoresDelta) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionDeltaWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: queryLargeRestoreProduction
+  value: "SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionLargeARC)%') ORDER BY CreatedDateTime DESC;"
+- name: queryMediumRestoreProduction
+  value: "SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumARC)%') ORDER BY CreatedDateTime DESC;"
+- name: querySmallRestoreProduction
+  value: "SELECT TOP $(numberOfProductionStoresARC) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallARC)%') ORDER BY CreatedDateTime DESC;"
+- name: queryDeltaRestoreProduction
+  value: "SELECT TOP $(numberOfProductionStoresDelta) Id,ProductionStoreId FROM [dbo].[Production] WHERE Name LIKE ('%$(productionDeltaARC)%') ORDER BY CreatedDateTime DESC;"
+- name: queryHybridProductionStoreCount
+  value: "SELECT COUNT(*) AS Count FROM [dbo].[ProductionStore] WHERE Name LIKE ('%$(productionStoreHybrid)%');"
+- name: queryHybridDeleteProductionStore
+  value: "DELETE FROM [dbo].[ProductionStore] WHERE Name LIKE ('%$(productionStoreHybrid)%');DELETE FROM [dbo].[Production] WHERE Name LIKE ('%$(productionLargeHybridWIP)%');DELETE FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumHybridWIP)%');DELETE FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallHybridWIP)%');"
+- name: queryHybridProductionStore
+  value: "SELECT TOP 1 Id,Name FROM [dbo].[ProductionStore] WHERE Name LIKE ('%$(productionStoreHybrid)%');"
+- name: queryHybridLargeProduction
+  value: "SELECT TOP 1 Name FROM [dbo].[Production] WHERE Name LIKE ('%$(productionLargeHybridWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: queryHybridMediumProduction
+  value: "SELECT TOP 1 Name FROM [dbo].[Production] WHERE Name LIKE ('%$(productionMediumHybridWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: queryHybridSmallProduction
+  value: "SELECT TOP 1 Name FROM [dbo].[Production] WHERE Name LIKE ('%$(productionSmallHybridWIP)%') ORDER BY CreatedDateTime DESC;"
+- name: boolCreateSMLProductionStores
+  value: "true"

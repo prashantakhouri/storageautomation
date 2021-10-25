@@ -1,0 +1,4 @@
+{
+  "ProductionStoreUri": "//${productionStoreMediumContainer}/",
+  "ProductionUri": "//${productionStoreMediumContainer}/${productionMedium}/"
+}
